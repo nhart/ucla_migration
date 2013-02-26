@@ -1,0 +1,5 @@
+name = UCLA Migration
+description = UCLA Migration scripts.
+core = 7.x
+version = 7.x-dev
+dependencies[] = islandora
