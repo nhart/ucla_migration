@@ -103,7 +103,6 @@ function ucla_migration_migrate_mets($file_path, $fedora_namespace) {
       $image_array[$i],
       $mets_xml,
       $collection);
-    break;
   }
 
   // Exit if ingest of any child object failed.
