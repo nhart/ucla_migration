@@ -14,13 +14,13 @@ function ucla_migration_drush_command() {
     'callback' => 'ucla_migration_migrate_mets',
     'description' => 'Ingest content from METS record.',
     'arguments' => array(
-      'path' => 'The file path to the METS file.'
+      'file_path' => 'The file path to the METS file.',
+      'fedora_namespace' => "The Fedora namespace to ingest everything under.",
     ),
     'options' => array(
-      'path' => 'The file path to the METS file.'
     ),
     'examples' => array(
-      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml'
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml uclans',
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
@@ -38,11 +38,7 @@ function ucla_migration_drush_command() {
  * @param string $fedora_namespace
  *   The Fedora namespace to ingest everything under.
  */
-function ucla_migration_migrate_mets($file_path) {
-  module_load_include('inc', 'islandora', 'includes/utilities');
-
-  $fedora_namespace = "uclaTest";
-
+function ucla_migration_migrate_mets($file_path, $fedora_namespace) {
   // Check to make sure the path to the mets file has been provided.
   if (!isset($file_path)) {
     drush_set_error('File path not provided',
@@ -71,14 +67,56 @@ function ucla_migration_migrate_mets($file_path) {
   $collection = ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml);
 
   // Exit if ingest of collection object failed.
-  // The ucla_migration_migrate_collection_object() function will appropriately
-  // call drush_set_error if there was an error, so no need for another.  Just
-  // exit the function.
-  if (!collection) {
+  if (!$collection) {
+    drush_set_error('Collection migration error.',
+      'Could not migrate collection object.  Check the watchdog logs for more info.',
+      'Error: ');
     return;
   }
 
-  drush_log("SUCCESS", 'ok');
+  // Query for each of the tiff files.
+  // Each one will correspond to a child of the recently created collection.
+  $image_query = "//mets:div[@TYPE='Image']";
+  $image_array = $mets_xml->xpath($image_query);
+
+  // Validate results.
+  if (!is_array($image_array)) {
+    drush_set_error("Invalid XPath",
+      "Error in XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  if (empty($image_array)) {
+    drush_set_error("No XPath Results",
+      "No results for XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  // Iterate over the query results, making and ingesting a child object for
+  // each tiff.
+  $ingest_success = TRUE;
+  for ($i = 0; $i < count($image_array) && $ingest_success; $i++) {
+    $image_xml_string = $image_array[$i]->asXML();
+    $ingest_success = ucla_migration_migrate_child_object($fedora_namespace,
+      $image_array[$i],
+      $mets_xml,
+      $collection);
+    break;
+  }
+
+  // Exit if ingest of any child object failed.
+  if (!$ingest_success) {
+    drush_set_error('Child migration error.',
+      'Could not migrate child object.  Check the watchdog logs for more info.',
+      'Error: ');
+    return;
+  }
+
+  drush_log("Successfully migrated {$collection->label} collection.", 'ok');
+
+  return;
 }
 
 /**
@@ -102,23 +140,26 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
   // Validate results.
   if (!is_array($collection_id_section_array)) {
-    drush_set_error("Invalid XPath",
-      "Error in XPath query $collection_id_section_query",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "Error in XPath query @query",
+      array('@query' => $collection_id_section_query),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
   if (empty($collection_id_section_array)) {
-    drush_set_error("No XPath Results",
-      "No results for XPath query $collection_id_section_query",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "No results for XPath query @query",
+      array('@query' => $collection_id_section_query),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
   if (count($collection_id_section_array) > 1) {
-    drush_set_error("Too many XPath Results",
-      "More than one result for XPath query $collection_id_section_query",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "More than one result for XPath query @query",
+      array('@query' => $collection_id_section_query),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
@@ -130,24 +171,27 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
   $collection_section_array = $mets_xml->xpath($collection_section_query);
 
   // Validate results.
-  if (!is_array($collection_section_array)) {
-    drush_set_error("Invalid XPath",
-      "Error in XPath query $collection_section_query",
-      "Error: ");
+  if (!is_array($collection_id_section_array)) {
+    watchdog('UCLA Migration',
+      "Error in XPath query @query",
+      array('@query' => $collection_section_query),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
-  if (empty($collection_section_array)) {
-    drush_set_error("No XPath Results",
-      "No results for XPath query $collection_section_query",
-      "Error: ");
+  if (empty($collection_id_section_array)) {
+    watchdog('UCLA Migration',
+      "No results for XPath query @query",
+      array('@query' => $collection_section_query),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
-  if (count($collection_section_array) > 1) {
-    drush_set_error("Too many XPath Results",
-      "More than one result for XPath query $collection_section_query",
-      "Error: ");
+  if (count($collection_id_section_array) > 1) {
+    watchdog('UCLA Migration',
+      "More than one result for XPath query @query",
+      array('@query' => $collection_section_query),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
@@ -158,16 +202,18 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
   // Validate.
   if ($collection_section->count() == 0) {
-    drush_set_error('No mdWrap element.',
-      "Could not locate mdWrap element for $collection_id in the METS.",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "Could not locate mdWrap element for @id in the METS.",
+      array('@id' => $collection_id),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
   if ($collection_section->count() > 1) {
-    drush_set_error('Too many mdWrap elements.',
-      "Multiple mdWrap elements for $collection_id in the METS.",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "Multiple mdWrap elements for @id in the METS.",
+      array('@id' => $collection_id),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
@@ -181,16 +227,18 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
   // Validate.
   if ($collection_mods->count() == 0) {
-    drush_set_error('No mods element.',
-      "Could not locate mods element for $collection_id in the METS.",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "Could not locate mods element for @id in the METS.",
+      array('@id' => $collection_id),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
   if ($collection_mods->count() > 1) {
-    drush_set_error('Too many mods elements.',
-      "Multiple mods elements for $collection_id in the METS.",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "Multiple mods elements for @id in the METS.",
+      array('@id' => $collection_id),
+      WATCHDOG_ERROR);
     return FALSE;
   }
 
@@ -203,16 +251,190 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
     $collection_label,
     $collection_mods->asXML());
 
+  watchdog('UCLA Migration',
+    "Ingesting @id.",
+    array('@id' => $collection->id),
+    WATCHDOG_INFO);
+
   // Ingest the NewFedoraObject.
   $ingest_results = islandora_add_object($collection);
 
   // Validate.
   if (!$ingest_results) {
-    drush_set_error('Failed ingest',
-      "Ingest for the collection object has failed.  Check the watchdog logs.",
-      "Error: ");
+    watchdog('UCLA Migration',
+      "Ingest for the collection object has failed.",
+      array(),
+      WATCHDOG_ERROR);
     return FALSE;
   }
+
+  watchdog('UCLA Migration',
+    "Ingested @id.",
+    array('@id' => $collection->id),
+    WATCHDOG_INFO);
+
+  // Return the ingested object.
+  return $ingest_results;
+}
+
+/**
+ * Migrates a child object of the collection object in the provided mets xml.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace to ingest everything under.
+ *
+ * @param SimpleXMLElement $image_xml
+ *   SimpleXML object that represents the mets div containing info about the 
+ *   tiff to migrate.
+ *
+ * @param SimpleXMLElement $mets_xml
+ *   SimpleXML object that represents the mets file from the path provided to
+ *   the drush script.
+ *
+ * @param NewFedoraObject $collection
+ *   The collection this child will be a member of.
+ *
+ * @return NewFedoraObject
+ *   The newly ingested child object.  Returns FALSE if there is an error
+ *   at any point in the process.
+ */
+function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $mets_xml, $collection) {
+  $dmdid = $image_xml->attributes()->DMDID;
+  $label = $image_xml->attributes()->LABEL;
+
+  // Get the children elements of the collection section that have a mets
+  // namespace.  This should correspond to a single mets:fptr element.
+  $xml_namespaces = $mets_xml->getDocNamespaces();
+  $fptr_section = $image_xml->children($xml_namespaces['mets']);
+
+  // Validate.
+  if ($fptr_section->count() == 0) {
+    watchdog('UCLA Migration',
+      "Could not locate fptr element for @id in the METS.",
+      array('@id' => $dmdid),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if ($fptr_section->count() > 1) {
+    watchdog('UCLA Migration',
+      "Multiple fptr elements for @id in the METS.",
+      array('@id' => $dmdid),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Grab the file id from the ftpr element.
+  $file_id = $fptr_section->attributes()->FILEID;
+
+  // Use the file id to lookup the file path.
+  $file_path_query = "//mets:file[@ID='$file_id']/mets:FLocat";
+  $file_path_array = $mets_xml->xpath($file_path_query);
+
+  // Validate.
+  if (!is_array($file_path_array)) {
+    watchdog('UCLA Migration',
+      "Error in XPath query @query",
+      array('@query' => $file_path_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (empty($file_path_array)) {
+    watchdog('UCLA Migration',
+      "No results for XPath query @query",
+      array('@query' => $file_path_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (count($file_path_array) > 1) {
+    watchdog('UCLA Migration',
+      "More than one result for XPath query @query",
+      array('@query' => $file_path_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Grab the file path from the XPath results.
+  $file_path = $file_path_array[0]->attributes($xml_namespaces['xlink'])->href;
+
+  // Use the DMDID to lookup the MODS record for this image.
+  $mods_query = "//mets:dmdSec[@ID='$dmdid']/mets:mdWrap[@MDTYPE='MODS']/mets:xmlData";
+  $mods_array = $mets_xml->xpath($mods_query);
+
+  // Validate.
+  if (!is_array($mods_array)) {
+    watchdog('UCLA Migration',
+      "Error in XPath query @query",
+      array('@query' => $mods_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (empty($mods_array)) {
+    watchdog('UCLA Migration',
+      "No results for XPath query @query",
+      array('@query' => $mods_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (count($mods_array) > 1) {
+    watchdog('UCLA Migration',
+      "More than one result for XPath query @query",
+      array('@query' => $mods_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Attempt to to get the MODS element from the XPath results.
+  $mods_element = $mods_array[0]->children('http://www.loc.gov/mods/v3');
+
+  // Validate.
+  if ($mods_element->count() == 0) {
+    watchdog('UCLA Migration',
+      "Could not locate mods element for @id in the METS.",
+      array('@id' => $dmdid),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if ($mods_element->count() > 1) {
+    watchdog('UCLA Migration',
+      "Multiple mods elements for @id in the METS.",
+      array('@id' => $dmdid),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Grab the MODS record as a string.
+  $mods_string = $mods_element->asXML();
+
+  // Create the NewFedoraObject for this image.
+  $child = ucla_migration_create_child_object($fedora_namespace,
+    $label,
+    $file_path,
+    $mods_string,
+    $collection);
+
+  // Ingest the NewFedoraObject.
+  $ingest_results = islandora_add_object($child);
+
+  // Validate.
+  if (!$ingest_results) {
+    watchdog('UCLA Migration',
+      "Ingest for the child object @id has failed.",
+      array('@id' => $dmdid),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  watchdog('UCLA Migration',
+    "Ingested @id.",
+    array('@id' => $child->id),
+    WATCHDOG_INFO);
+
 
   // Return the ingested object.
   return $ingest_results;
@@ -257,6 +479,42 @@ function ucla_migration_add_mods_to_object($object, $mods_txt) {
 }
 
 /**
+ * Adds a DC datastream to the supplied object from the supplied MODS text.
+ *
+ * @param NewFedoraObject $object
+ *   The object you wish to add the datastream to.
+ *
+ * @param string $mods_txt
+ *   A string of valid MODS text.
+ */
+function ucla_migration_add_dc_to_object_from_mods($object, $mods_txt) {
+  // Prepare the MODS to DC transform.
+  $xslt_proc = new XSLTProcessor();
+  $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/mods_to_dc.xsl';
+  $xslt_dom = new DOMDocument();
+  $xslt_dom->load($xslt_file);
+  $xslt_proc->importStyleSheet($xslt_dom);
+
+  // Prepare the mods DOM to transform
+  $mods_dom = new DOMDocument();
+  // Give it the xsi namespace so loadXML() won't complain.
+  $mods_txt = str_replace("xmlns:mods=\"http://www.loc.gov/mods/v3\"",
+    "xmlns:mods=\"http://www.loc.gov/mods/v3\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+    $mods_txt);
+  $mods_dom->loadXML($mods_txt);
+
+  // Transform the MODS to DC.
+  $dc_txt = $xslt_proc->transformToXML($mods_dom);
+
+  // Add DC record to the object as a datastream.
+  $datastream = $object->constructDatastream('DC', 'M');
+  $datastream->label = "Dublin Core Record";
+  $datastream->mimetype = "text/xml";
+  $datastream->setContentFromString($dc_txt);
+  $object->ingestDatastream($datastream);
+}
+
+/**
  * Adds a tiff (from path) to the supplied object as the OBJ datastream.
  *
  * @param NewFedoraObject $object
@@ -276,7 +534,8 @@ function ucla_migration_add_tiff_to_object($object, $tiff_path) {
 /**
  * Creates the collection object for this migration.
  *
- * Adds relationships and content models for the collection.
+ * Adds relationships and content models for the collection, as well as a MODS
+ * datastream.
  *
  * @param string $fedora_namespace
  *   The Fedora namespace to ingest everything under.
@@ -295,5 +554,40 @@ function ucla_migration_create_collection_object($fedora_namespace, $label, $mod
   $collection->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:collectionCModel');
   $collection->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', 'islandora:root');
   ucla_migration_add_mods_to_object($collection, $mods_txt);
+  ucla_Migration_add_dc_to_object_from_mods($collection, $mods_txt);
   return $collection;
+}
+
+/**
+ * Creates a child object for the collection in this migration.
+ *
+ * Adds relationships and content models for the child, as well as MODS and OBJ
+ * datastreams.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace to ingest everything under.
+ *
+ * @param string $label
+ *   The label to give the NewFedoraObject
+ *
+ * @param string $tiff_path
+ *   Path to a high-res tiff for the OBJ datastream.
+ *
+ * @param string $mods_txt
+ *   A string of valid MODS text.
+ *
+ * @param NewFedoraObject $collection
+ *   The collection this child will be a member of.
+ *
+ * @return NewFedoraObject
+ *   The fully constructed and setup collection object.
+ */
+function ucla_migration_create_child_object($fedora_namespace, $label, $tiff_path, $mods_txt, $collection) {
+  $child = ucla_migration_create_fedora_object($fedora_namespace, $label);
+  $child->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
+  $child->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
+  ucla_migration_add_mods_to_object($child, $mods_txt);
+  ucla_Migration_add_dc_to_object_from_mods($child, $mods_txt);
+  ucla_migration_add_tiff_to_object($child, $tiff_path);
+  return $child;
 }
