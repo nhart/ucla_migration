@@ -23,16 +23,6 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
-  $items['ucla_fix_mods'] = array(
-    'callback' => 'ucla_migration_fix_mods_for_namespace',
-    'description' => 'Fix MODS records.',
-    'arguments' => array(),
-    'options' => array(),
-    'examples' => array(
-      'simple example' => 'drush -u 1 -l http://example.com ucla_fix_mods',
-    ),
-    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
-  );
   return $items;
 }
 
@@ -946,31 +936,4 @@ function ucla_migration_create_child_object($fedora_namespace, $label, $tiff_pat
   ucla_Migration_add_dc_to_object_from_mods($child, $mods_txt);
   ucla_migration_add_tiff_to_object($child, $tiff_path);
   return $child;
-}
-
-function ucla_migration_fix_mods_for_namespace() {
-  $collection = islandora_object_load("piercephoto:1");
-  module_load_include('inc', 'islandora', 'includes/utilities');
-  $query = 'SELECT $object
-     FROM <#ri>
-     WHERE {
-            $object $collection_predicate <info:fedora/' . $collection->id . '> ;
-                   <fedora-model:state> <fedora-model:Active>';
-  $query .= 'FILTER(regex(str(?object), "info:fedora/(' . 'piercephoto' . '):"))';
-  $query .= '}';
-  $query_array = array(
-    'query' => $query,
-    'type' => 'sparql',
-  );
-  $results = $collection->repository->ri->query($query_array['query'], $query_array['type']);
-  foreach ($results as $result) {
-    $pid = $result['object']['value'];
-    drush_log($pid, 'ok');
-    $obj = islandora_object_load($pid);
-    $mods = $obj['MODS']->content;
-    drush_log("BEFORE: $mods", 'ok');
-    $mods = ucla_migration_add_xsi_namespace_to_mods_txt($mods);
-    drush_log("AFTER: $mods", 'ok');
-    $obj['MODS']->setContentFromString($mods);
-  }
 }
