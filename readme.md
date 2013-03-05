@@ -39,6 +39,7 @@ For example:
 
 You can recover a failed migration by entering the numerical portion of the pid of the last successfully ingested object.  You can discover the last successfully ingested object by tailing the logs.
 * drush -i 1 -l *server_url* ucla_migrate_mets *mets_path* *ingest_namespace* *last_ingest_number*
+
 For example, if your logs tell you the last ingested object was piercephoto:60, you can use:
 * drush -u 1 -l http://lit250v.library.ucla.edu ucla_migrate_mets http://digidev.library.ucla.edu/mets/pierce/21198-zz00294nxr.xml piercephoto 60
 
@@ -57,4 +58,5 @@ Logging
 -------
 This script uses watchdog to log information as it executes.  You can tail the watchdog logs by executing the following command within a drupal filesystem:
 * $ drush ws --tail --full
+
 All errors, as well as the pid of each successfully ingested object, gets written to the logs.  You can use this info to debug a failed migration, and even recover one by passing the numerical portion of the pid of the last successfully ingested object into the *ucla_migrate_mets* drush command.
