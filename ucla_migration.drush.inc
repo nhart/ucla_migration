@@ -26,12 +26,10 @@ function ucla_migration_drush_command() {
   $items['ucla_fix_mods'] = array(
     'callback' => 'ucla_migration_fix_mods_for_namespace',
     'description' => 'Fix MODS records.',
-    'arguments' => array(
-      'fedora_namespace' => "The Fedora namespace to ingest everything under.",
-    ),
+    'arguments' => array(),
     'options' => array(),
     'examples' => array(
-      'simple example' => 'drush -u 1 -l http://example.com ucla_fix_mods uclans',
+      'simple example' => 'drush -u 1 -l http://example.com ucla_fix_mods',
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
@@ -860,7 +858,7 @@ function ucla_migration_add_dc_to_object_from_mods($object, $mods_txt) {
  */
 function ucla_migration_add_xsi_namespace_to_mods_txt($mods_txt) {
   return str_replace("xmlns:mods=\"http://www.loc.gov/mods/v3\"",
-    "xmlns:mods=\"http://www.loc.gov/mods/v3\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+    "xmlns:mods=\"http://www.loc.gov/mods/v3\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"",
     $mods_txt);
 }
 
@@ -959,7 +957,7 @@ function ucla_migration_fix_mods_for_namespace() {
             $object $collection_predicate <info:fedora/' . $collection->id . '> ;
                    <fedora-model:state> <fedora-model:Active>';
   $query .= 'FILTER(regex(str(?object), "info:fedora/(' . 'piercephoto' . '):"))';
-  $query .= '} ORDER BY $title';
+  $query .= '}';
   $query_array = array(
     'query' => $query,
     'type' => 'sparql',
@@ -967,9 +965,12 @@ function ucla_migration_fix_mods_for_namespace() {
   $results = $collection->repository->ri->query($query_array['query'], $query_array['type']);
   foreach ($results as $result) {
     $pid = $result['object']['value'];
+    drush_log($pid, 'ok');
     $obj = islandora_object_load($pid);
     $mods = $obj['MODS']->content;
-    $mods = ucla_migration_add_xsi_namespace_to_mods_txt($mods);;
+    drush_log("BEFORE: $mods", 'ok');
+    $mods = ucla_migration_add_xsi_namespace_to_mods_txt($mods);
+    drush_log("AFTER: $mods", 'ok');
     $obj['MODS']->setContentFromString($mods);
   }
 }
