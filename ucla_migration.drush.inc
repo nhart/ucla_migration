@@ -23,6 +23,18 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
+  $items['ucla_fix_mods'] = array(
+    'callback' => 'ucla_migration_fix_mods_for_namespace',
+    'description' => 'Fix MODS records.',
+    'arguments' => array(
+      'fedora_namespace' => "The Fedora namespace to ingest everything under.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_fix_mods uclans',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
   return $items;
 }
 
@@ -41,7 +53,7 @@ function ucla_migration_drush_command() {
  *
  * @param string $recovery_number
  *   The number portion of the PID from the last successfully ingested object.
- **/
+ */
 function ucla_migration_migrate_mets($file_path, $fedora_namespace, $recovery_number = 0) {
   // Check to make sure the path to the mets file has been provided.
   if (!isset($file_path)) {
@@ -106,7 +118,7 @@ function ucla_migration_migrate_mets($file_path, $fedora_namespace, $recovery_nu
  *
  * @return bool
  *   Returns TRUE if success, FALSE if error.
- **/
+ */
 function ucla_migration_start_new_migration($mets_xml, $fedora_namespace) {
   // Create the collection first.
   $collection = ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml);
@@ -183,8 +195,8 @@ function ucla_migration_recover_migration($mets_xml, $fedora_namespace, $recover
   $parent = $parents[0];
 
   // Migrate all the children if the parent id is the root collection.  This
-  // would indicate that only the collection object has been ingested, so basically
-  // start over.
+  // would indicate that only the collection object has been ingested, so
+  // basically start over.
   if ($parent->id == "islandora:root") {
     return ucla_migration_migrate_all_children($fedora_namespace,
       $mets_xml,
@@ -534,18 +546,18 @@ function ucla_migration_get_all_children_xmls($mets_xml) {
 function ucla_migration_get_identifier_from_object_mods($object) {
   // Exit early if there's no MODS datastream.
   if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-      watchdog('UCLA Migration',
-        "No MODS for object @pid",
-        array('@pid' => $object->id),
-        WATCHDOG_ERROR);
-      return FALSE;
+    watchdog('UCLA Migration',
+      "No MODS for object @pid",
+      array('@pid' => $object->id),
+      WATCHDOG_ERROR);
+    return FALSE;
   }
 
-  // Make a SimpleXMLElement for the MODS
+  // Make a SimpleXMLElement for the MODS.
   $mods_txt = $object['MODS']->content;
   $mods = simplexml_load_string($mods_txt);
 
-  // Register namespaces of the root element
+  // Register namespaces of the root element.
   $xml_namespaces = $mods->getDocNamespaces();
   $mods->registerXPathNamespace('mods', $xml_namespaces['mods']);
 
@@ -936,4 +948,28 @@ function ucla_migration_create_child_object($fedora_namespace, $label, $tiff_pat
   ucla_Migration_add_dc_to_object_from_mods($child, $mods_txt);
   ucla_migration_add_tiff_to_object($child, $tiff_path);
   return $child;
+}
+
+function ucla_migration_fix_mods_for_namespace() {
+  $collection = islandora_object_load("piercephoto:1");
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  $query = 'SELECT $object
+     FROM <#ri>
+     WHERE {
+            $object $collection_predicate <info:fedora/' . $collection->id . '> ;
+                   <fedora-model:state> <fedora-model:Active>';
+  $query .= 'FILTER(regex(str(?object), "info:fedora/(' . 'piercephoto' . '):"))';
+  $query .= '} ORDER BY $title';
+  $query_array = array(
+    'query' => $query,
+    'type' => 'sparql',
+  );
+  $results = $collection->repository->ri->query($query_array['query'], $query_array['type']);
+  foreach ($results as $result) {
+    $pid = $result['object']['value'];
+    $obj = islandora_object_load($pid);
+    $mods = $obj['MODS']->content;
+    $mods = ucla_migration_add_xsi_namespace_to_mods_txt($mods);;
+    $obj['MODS']->setContentFromString($mods);
+  }
 }
