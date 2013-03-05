@@ -17,8 +17,7 @@ function ucla_migration_drush_command() {
       'file_path' => 'The file path to the METS file.',
       'fedora_namespace' => "The Fedora namespace to ingest everything under.",
     ),
-    'options' => array(
-    ),
+    'options' => array(),
     'examples' => array(
       'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml uclans',
     ),
@@ -63,7 +62,7 @@ function ucla_migration_migrate_mets($file_path, $fedora_namespace, $recovery_nu
 
   $mets_xml = simplexml_load_string($mets_file);
 
-  // Register namespaces of the root element
+  // Register namespaces of the root element.
   $xml_namespaces = $mets_xml->getDocNamespaces();
   $mets_xml->registerXPathNamespace('mets', $xml_namespaces['mets']);
   $mets_xml->registerXPathNamespace('xlink', $xml_namespaces['xlink']);
@@ -340,11 +339,6 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
     $collection_label,
     $collection_mods->asXML());
 
-  watchdog('UCLA Migration',
-    "Ingesting @id.",
-    array('@id' => $collection->id),
-    WATCHDOG_INFO);
-
   // Ingest the NewFedoraObject.
   $ingest_results = islandora_add_object($collection);
 
@@ -612,8 +606,8 @@ function ucla_migration_get_identifier_from_object_mods($object) {
  * @param string $fedora_namespace
  *   The Fedora namespace to ingest everything under.
  *
- * @param SimpleXMLElement $image_xml(neocomplcache_start_auto_complete)=
- *   SimpleXML object that represents the mets div containing info about the 
+ * @param SimpleXMLElement $image_xml
+ *   SimpleXML object that represents the mets div containing info about the
  *   tiff to migrate.
  *
  * @param SimpleXMLElement $mets_xml
@@ -769,7 +763,6 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
     array('@id' => $child->id),
     WATCHDOG_INFO);
 
-
   // Return the ingested object.
   return $ingest_results;
 }
@@ -829,7 +822,7 @@ function ucla_migration_add_dc_to_object_from_mods($object, $mods_txt) {
   $xslt_dom->load($xslt_file);
   $xslt_proc->importStyleSheet($xslt_dom);
 
-  // Prepare the mods DOM to transform
+  // Prepare the mods DOM to transform.
   $mods_dom = new DOMDocument();
   $mods_dom->loadXML($mods_txt);
 
