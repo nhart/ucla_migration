@@ -331,7 +331,7 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
   // cry every time something is done with the MODS.  The namespaces is in the
   // root node of the mets, but not the root node of the MODS.  So we'll just
   // add it in here for completeness.
-  ucla_migration_add_xsi_namespace_to_mods_txt($mods_string);
+  $mods_string = ucla_migration_add_xsi_namespace_to_mods_txt($mods_string);
 
   // Create the NewFedoraObject for the collection.
   $collection = ucla_migration_create_collection_object(
@@ -737,7 +737,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   // cry every time something is done with the MODS.  The namespaces is in the
   // root node of the mets, but not the root node of the MODS.  So we'll just
   // add it in here for completeness.
-  ucla_migration_add_xsi_namespace_to_mods_txt($mods_string);
+  $mods_string = ucla_migration_add_xsi_namespace_to_mods_txt($mods_string);
 
   // Create the NewFedoraObject for this image.
   $child = ucla_migration_create_child_object($fedora_namespace,
