@@ -16,6 +16,7 @@ function ucla_migration_drush_command() {
     'arguments' => array(
       'file_path' => 'The file path to the METS file.',
       'fedora_namespace' => "The Fedora namespace to ingest everything under.",
+      'recovery_number' => "The numerical portion of the PID of the last ingested object.",
     ),
     'options' => array(),
     'examples' => array(
@@ -23,7 +24,100 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
+  $items['ucla_migrate_from_dmdid'] = array(
+    'callback' => 'ucla_migration_migrate_from_dmdid',
+    'description' => 'Ingest content of a single object from METS record based on DMDID.',
+    'arguments' => array(
+      'file_path' => 'The file path to the METS file.',
+      'fedora_namespace' => "The Fedora namespace to ingest under.",
+      'dmdid' => "The DMDID of the record in the METS file."
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml uclans 21198-zz002bzx2v',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
   return $items;
+}
+
+function ucla_migration_migrate_from_dmdid($file_path, $fedora_namespace, $dmdid) {
+  // Check to make sure the path to the mets file has been provided.
+  if (!isset($file_path)) {
+    drush_set_error('File path not provided',
+      'Path to mets file not provided as command line argument',
+      'Error: ');
+    return;
+  }
+
+  // Attempt to grab the mets file.
+  $mets_file = file_get_contents($file_path);
+  if (!$mets_file) {
+    drush_set_error('File not found',
+      "Could not locate mets file $file_path",
+      "Error: ");
+    return;
+  }
+
+  $mets_xml = simplexml_load_string($mets_file);
+
+  // Register namespaces of the root element.
+  $xml_namespaces = $mets_xml->getDocNamespaces();
+  $mets_xml->registerXPathNamespace('mets', $xml_namespaces['mets']);
+  $mets_xml->registerXPathNamespace('xlink', $xml_namespaces['xlink']);
+
+  // Get the collection object.
+  // Probably a bad assumption, but it'll work for now.
+  $collection = islandora_object_load($fedora_namespace . ":1");
+
+  if (!$collection) {
+    drush_set_error('No Collection Object',
+      'Could not load collection object.  Perhaps the fedora namespace is wrong, or the collection object is not the first object in the namespace.',
+      'Error: ');
+    return;
+  }
+
+  // Query for the tiff file.
+  $dmdid = "DMD-" . $dmdid;
+  $image_query = "//mets:div[@TYPE='Image' and @DMDID='$dmdid']";
+  $image_array = $mets_xml->xpath($image_query);
+
+  // Validate results.
+  if (!is_array($image_array)) {
+    watchdog('UCLA Migration',
+      "Error in XPath query @query",
+      array('@query' => $image_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (empty($image_array)) {
+    watchdog('UCLA Migration',
+      "No results for XPath query @query",
+      array('@query' => $image_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (count($image_array) > 1) {
+    watchdog('UCLA Migration',
+      "Multiple results for XPath query @query",
+      array('@query' => $image_query),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  $results = ucla_migration_migrate_child_object($fedora_namespace, $image_array[0], $mets_xml, $collection);
+
+  // Final message to user.
+  if ($results) {
+    drush_log("Success", 'ok');
+  }
+  else {
+    drush_log("Fail.  Check the watchdog logs for more info.", 'error');
+  }
+
+  return;
 }
 
 /**
@@ -393,6 +487,12 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
       $image_array[$i],
       $mets_xml,
       $collection);
+    if ($ingest_success) {
+      watchdog('UCLA Migration',
+        'Migrated object @current / @total',
+        array('@current' => $i + 1, '@total' => count($image_array)),
+        WATCHDOG_INFO);
+    }
   }
 
   // Exit if ingest of any child object failed.
@@ -468,6 +568,12 @@ function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $co
       $image_array[$i],
       $mets_xml,
       $collection);
+    if ($ingest_success) {
+      watchdog('UCLA Migration',
+        'Migrated object @current / @total',
+        array('@current' => $i + 1, '@total' => count($image_array)),
+        WATCHDOG_INFO);
+    }
   }
 
   // Exit if ingest of any child object failed.
@@ -759,8 +865,8 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   }
 
   watchdog('UCLA Migration',
-    "Ingested @id.",
-    array('@id' => $child->id),
+    "Ingested @dmdid as @pid",
+    array('@dmdid' => $dmdid, '@pid' => $child->id),
     WATCHDOG_INFO);
 
   // Return the ingested object.
