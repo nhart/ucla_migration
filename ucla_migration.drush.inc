@@ -24,20 +24,6 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
-  $items['ucla_migrate_from_dmdid'] = array(
-    'callback' => 'ucla_migration_migrate_from_dmdid',
-    'description' => 'Ingest content of a single object from METS record based on DMDID.',
-    'arguments' => array(
-      'file_path' => 'The file path to the METS file.',
-      'fedora_namespace' => "The Fedora namespace to ingest under.",
-      'dmdid' => "The DMDID of the record in the METS file."
-    ),
-    'options' => array(),
-    'examples' => array(
-      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml uclans 21198-zz002bzx2v',
-    ),
-    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
-  );
   return $items;
 }
 
@@ -410,8 +396,8 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
       $collection);
     if ($ingest_success) {
       watchdog('UCLA Migration',
-        'Migrated object @current / @total',
-        array('@current' => $i + 1, '@total' => count($image_array)),
+        'Migrated object @idx out of @total',
+        array('@idx' => $i + 1, '@total' => count($image_array)),
         WATCHDOG_INFO);
     }
   }
@@ -491,8 +477,8 @@ function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $co
       $collection);
     if ($ingest_success) {
       watchdog('UCLA Migration',
-        'Migrated object @current / @total',
-        array('@current' => $i + 1, '@total' => count($image_array)),
+        'Migrated object @idx / @total',
+        array('@idx' => $i + 1, '@total' => count($image_array)),
         WATCHDOG_INFO);
     }
   }
@@ -661,7 +647,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($fptr_section->count() == 0) {
     watchdog('UCLA Migration',
       "Could not locate fptr element for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -669,7 +655,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($fptr_section->count() > 1) {
     watchdog('UCLA Migration',
       "Multiple fptr elements for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -745,7 +731,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($mods_element->count() == 0) {
     watchdog('UCLA Migration',
       "Could not locate mods element for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -753,7 +739,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($mods_element->count() > 1) {
     watchdog('UCLA Migration',
       "Multiple mods elements for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -776,18 +762,20 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   // Ingest the NewFedoraObject.
   $ingest_results = islandora_add_object($child);
 
+  dd("BEFORE VALIDATION");
+
   // Validate.
   if (!$ingest_results) {
     watchdog('UCLA Migration',
       "Ingest for the child object @id has failed.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
 
   watchdog('UCLA Migration',
-    "Ingested @dmdid as @pid",
-    array('@dmdid' => $dmdid, '@pid' => $child->id),
+    'Ingested @id as @pid',
+    array('@id' => (string)$dmdid, '@pid' => $ingest_results->id),
     WATCHDOG_INFO);
 
   // Return the ingested object.
