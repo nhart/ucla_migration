@@ -71,8 +71,8 @@ If anyone was purging or ingesting objects into Fedora while the resource index 
 tl;dr
 * $ cd /var/www/html/drupal/sites/all/modules
 * $ drush -u 1 -l *server_url* ucla_save_pids_for_namespace *ingest_namespace*
-* Edit line 351 of /usr/local/feodra/server/config/fedora.fcfg to &ltparam name="level" value="0"&gt
+* Edit line 351 of /usr/local/feodra/server/config/fedora.fcfg to &lt;param name="level" value="0"&gt;
 * $ sudo /etc/init.d/fedora restart
 * $ drush -u 1 -l *server_url* ucla_make_namespace_versionable *ingest_namespace*
-* Edit line 351 of /usr/local/feodra/server/config/fedora.fcfg to &ltparam name="level" value="1"&gt
+* Edit line 351 of /usr/local/feodra/server/config/fedora.fcfg to &lt;param name="level" value="1"&gt;
 * $ sudo /etc/init.d/fedora restart
