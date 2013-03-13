@@ -61,3 +61,18 @@ This script uses watchdog to log information as it executes.  You can tail the w
 * $ drush ws --tail --full
 
 All errors, as well as the pid of each successfully ingested object, gets written to the logs.  You can use this info to debug a failed migration, and even recover one by passing the numerical portion of the pid of the last successfully ingested object into the *ucla_migrate_mets* drush command.
+
+Fixing versionable datastreams
+------------------------------
+This script has run into the FCREPO-849 bug when creating the DC datatreams from the MODS records in the METS.  At discoverygarden, we've patched up the Tuque library to work around it so it will never happen again.  But if you've already run migrations, there's a few hoops you'll have to jump through to fix the already ingested objects.  You'll need to run the ucla_save_pids_for_namespace drush command for all the namespaces you've already ingested under.  Then you need to disable the resource index in the fedora.fcfg config file and restart the Fedora stack.  Then execute the ucla_make_namespace_versionable drush command for each broken namespace.  Afterwards, re-enable the resource index in fedora.fcfg and restart the Fedora stack.
+
+If anyone was purging or ingesting objects into Fedora while the resource index was turned off, you'll have to rebuild the resource index, which can be time consuming depending on the number of ingested objects.  It's best to inform any interested parties to stay off the server while you're executing this fix.
+
+tl;dr
+* $ cd /var/www/html/drupal/sites/all/modules
+* $ drush -u 1 -l *server_url* ucla_save_pids_for_namespace *ingest_namespace*
+* Edit line 351 of /usr/local/feodra/server/config/fedora.fcfg to <param name="level" value="0">
+* $ sudo /etc/init.d/fedora restart
+* $ drush -u 1 -l *server_url* ucla_make_namespace_versionable *ingest_namespace*
+* Edit line 351 of /usr/local/feodra/server/config/fedora.fcfg to <param name="level" value="1">
+* $ sudo /etc/init.d/fedora restart
