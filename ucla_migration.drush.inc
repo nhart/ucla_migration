@@ -12,7 +12,7 @@ function ucla_migration_drush_command() {
   $items = array();
   $items['ucla_migrate_mets'] = array(
     'callback' => 'ucla_migration_migrate_mets',
-    'description' => 'Ingest content from METS record.',
+    'description' => 'Ingest content from METS file for all records.',
     'arguments' => array(
       'file_path' => 'The file path to the METS file.',
       'fedora_namespace' => "The Fedora namespace to ingest everything under.",
@@ -24,11 +24,25 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
+  $items['ucla_migrate_from_dmdid'] = array(
+    'callback' => 'ucla_migration_migrate_from_dmdid',
+    'description' => 'Ingest content from METS file for a single record.',
+    'arguments' => array(
+      'file_path' => 'The file path to the METS file.',
+      'fedora_namespace' => "The Fedora namespace to ingest the record under.",
+      'dmdid' => "The record ID provided in the MODS for this particular record.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml uclans 21198-zz002bzvvs',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
   return $items;
 }
 
 /**
- * Main function of this drush script.
+ * Migrates all records in a METS file.
  *
  * Executes the migration based on a mets file.  Can recover a previously
  * failed ingest if the numeric portion of the last successfully ingested
@@ -201,6 +215,96 @@ function ucla_migration_recover_migration($mets_xml, $fedora_namespace, $recover
       $last_good_object,
       $starting_pid);
   }
+}
+
+/**
+ * Migrates a single object based on record ID.
+ *
+ * @param string $file_path
+ *   The path to the mets file serving as the manifest for this ingest.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace to ingest everything under.
+ *
+ * @param string $dmdid
+ *   The record ID provided in the MODS for the record to migrate.
+ */
+function ucla_migration_migrate_from_dmdid($file_path, $fedora_namespace, $dmdid) {
+  // Check to make sure the path to the mets file has been provided.
+  if (!isset($file_path)) {
+    drush_set_error('File path not provided',
+      'Path to mets file not provided as command line argument',
+      'Error: ');
+    return;
+  }
+
+  // Attempt to grab the mets file.
+  $mets_file = file_get_contents($file_path);
+  if (!$mets_file) {
+    drush_set_error('File not found',
+      "Could not locate mets file $file_path",
+      "Error: ");
+    return;
+  }
+
+  $mets_xml = simplexml_load_string($mets_file);
+
+  // Register namespaces of the root element.
+  $xml_namespaces = $mets_xml->getDocNamespaces();
+  $mets_xml->registerXPathNamespace('mets', $xml_namespaces['mets']);
+  $mets_xml->registerXPathNamespace('xlink', $xml_namespaces['xlink']);
+
+  // Get the collection object.
+  // Probably a bad assumption, but it'll work for now.
+  $collection = islandora_object_load($fedora_namespace . ":1");
+
+  if (!$collection) {
+    drush_set_error('No Collection Object',
+      'Could not load collection object.  Perhaps the fedora namespace is wrong, or the collection object is not the first object in the namespace.',
+      'Error: ');
+    return;
+  }
+
+  // Query for the tiff file.
+  $dmdid = "DMD-" . $dmdid;
+  $image_query = "//mets:div[@TYPE='Image' and @DMDID='$dmdid']";
+  $image_array = $mets_xml->xpath($image_query);
+
+  // Validate results.
+  if (!is_array($image_array)) {
+    drush_set_error('XPath Error',
+      "Error in XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  if (empty($image_array)) {
+    drush_set_error('XPath Error',
+      "No results for XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  if (count($image_array) > 1) {
+    drush_set_error('XPath Error',
+      "Multiple results for XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  $results = ucla_migration_migrate_child_object($fedora_namespace, $image_array[0], $mets_xml, $collection);
+
+  // Final message to user.
+  if (!$results) {
+    drush_set_error('Migration error',
+      "Error migrating object from dmdid $dmdid",
+      "Error: ");
+    return;
+  }
+
+  drush_log("Migration success.  Check watchdog logs for more information.", 'ok');
+
+  return;
 }
 
 /**
