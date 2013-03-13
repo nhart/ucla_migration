@@ -10,6 +10,30 @@
  */
 function ucla_migration_drush_command() {
   $items = array();
+  $items['ucla_save_pids_for_namespace'] = array(
+    'callback' => 'ucla_migration_save_pids_for_namespace',
+    'description' => 'Gets all PIDS for the given namespace and saves them to a file.',
+    'arguments' => array(
+      'fedora_namespace' => "The Fedora namespace whose PIDS you're looking for.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_save_pids_for_namespace your_namespace',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+  $items['ucla_make_namespace_versionable'] = array(
+    'callback' => 'ucla_migration_make_all_datastreams_versionable',
+    'description' => "Sets all datastreams for all objects to versionable in the given namespace. Only run after executing ucla_save_pids_for_namespace and confirming that Fedora's resource index is turned off.",
+    'arguments' => array(
+      'fedora_namespace' => "The Fedora namespace whose objects' datastreams you wish to make versionable.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_make_namespace_versionable your_namespace',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
   $items['ucla_migrate_mets'] = array(
     'callback' => 'ucla_migration_migrate_mets',
     'description' => 'Ingest content from METS file for all records.',
@@ -34,11 +58,122 @@ function ucla_migration_drush_command() {
     ),
     'options' => array(),
     'examples' => array(
-      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_mets /home/dgiuser/21198-zz00294nxr.xml uclans 21198-zz002bzvvs',
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_from_dmdid /home/dgiuser/21198-zz00294nxr.xml uclans 21198-zz002bzvvs',
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
   return $items;
+}
+
+/**
+ * Saves all pids in a Fedora namespace to a file.
+ *
+ * This is done so ucla_make_namespace_versionable can have a list of all pids
+ * for the given namespace after Fedora's resource index gets disabled.  Output
+ * file is written to the ucla_migration module folder.  It is given the name
+ * of the fedora namespace and an extension of '.pid'.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace whose PIDS you want.
+ */
+function ucla_migration_save_pids_for_namespace($fedora_namespace) {
+  // Get a connection to Fedora.
+  $connection = islandora_get_tuque_connection();
+  $repo = $connection->repository;
+
+  // SPARQL query to get all objects in a given namespace.
+  $query =
+  "
+    SELECT ?obj
+    FROM <#ri>
+    WHERE {
+      ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
+      FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:'))
+    }
+  ";
+
+  // Execute the query.
+  $results = $repo->ri->sparqlQuery($query);
+
+  // Put all the pids in an array.
+  $pids = array();
+  foreach ($results as $result) {
+    array_push($pids, $result['obj']['value']);
+  }
+
+  // JSON encode the array and write it to a file.
+  $path = DRUPAL_ROOT . '/' . drupal_get_path('module', 'ucla_migration') . "/$fedora_namespace.pids";
+  $fp = fopen($path, 'w');
+  if (!$fp) {
+    drush_set_error("Can't open file to write",
+      "Cannot open file $path to write.  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    return;
+  }
+
+  if (!fwrite($fp, json_encode($pids))) {
+    drush_set_error("Can't write pids to file",
+      "Cannot write pids to $path.  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    fclose($fp);
+    return;
+  }
+
+  fclose($fp);
+  return;
+}
+
+/**
+ * Sets all datastreams for all objects in a Fedora namespace to versionable.
+ *
+ * Reads in the output of ucla_migration_save_pids_for_namespace because this
+ * cannot be run with Fedora's resource index enabled.  Be sure to execute the
+ * ucla_save_pids_for_namespace Drush command first, then disable the resource
+ * index and restart Fedora.  Then run this command.  Then re-enable the
+ * resource index and restart Fedora again.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace whose datastreams you want to fix.
+ */
+function ucla_migration_make_all_datastreams_versionable($fedora_namespace) {
+  // Open up the pid file to read.
+  $path = DRUPAL_ROOT . '/' . drupal_get_path('module', 'ucla_migration') . "/$fedora_namespace.pids";
+  $fp = fopen($path, 'r');
+
+  if (!$fp) {
+    drush_set_error("Can't open file to read",
+      "Cannot open file $path to read.  Does it exist?  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    return;
+  }
+
+  // Grab its contents.
+  $contents = fread($fp, filesize($path));
+  if (!$contents) {
+    drush_set_error("Can't read file contents.",
+      "Cannot read contents of $path.  Does it exist?  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    fclose($fp);
+    return;
+  }
+
+  // Close the file pointer so we're not leaking all over the place.
+  fclose($fp);
+
+  // JSON decode the array of pids.
+  $pids = json_decode($contents);
+
+  // Set each datastream for each object in the namespace to versionable.
+  foreach ($pids as $pid) {
+    $obj = islandora_object_load($pid);
+    foreach ($obj as $dsid => $dsObj) {
+      $dsObj->versionable = TRUE;
+    }
+  }
 }
 
 /**
@@ -479,7 +614,7 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
  *   The collection this child will be a member of.
  *
  * @return bool
- *   Returns TRUE if succesfull, FALSE if error.
+ *   Returns TRUE if succesful, FALSE if error.
  */
 function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $collection) {
   // Get all the children objects.  Each one will correspond to a tiff file.
@@ -535,7 +670,7 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
  *   The last successfully ingested object from the previous migration attempt.
  *
  * @return bool
- *   Returns TURE if successfull, FALSE if there is an error.
+ *   Returns TRUE if successful, FALSE if there is an error.
  */
 function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $collection, $last_good_object, $starting_pid) {
   // Try to delete the object AFTER the last successfully ingested object.  If
@@ -865,8 +1000,6 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
 
   // Ingest the NewFedoraObject.
   $ingest_results = islandora_add_object($child);
-
-  dd("BEFORE VALIDATION");
 
   // Validate.
   if (!$ingest_results) {
