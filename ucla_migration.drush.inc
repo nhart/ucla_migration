@@ -10,12 +10,37 @@
  */
 function ucla_migration_drush_command() {
   $items = array();
+  $items['ucla_save_pids_for_namespace'] = array(
+    'callback' => 'ucla_migration_save_pids_for_namespace',
+    'description' => 'Gets all PIDS for the given namespace and saves them to a file.',
+    'arguments' => array(
+      'fedora_namespace' => "The Fedora namespace whose PIDS you're looking for.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_save_pids_for_namespace your_namespace',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+  $items['ucla_make_namespace_versionable'] = array(
+    'callback' => 'ucla_migration_make_all_datastreams_versionable',
+    'description' => "Sets all datastreams for all objects to versionable in the given namespace. Only run after executing ucla_save_pids_for_namespace and confirming that Fedora's resource index is turned off.",
+    'arguments' => array(
+      'fedora_namespace' => "The Fedora namespace whose objects' datastreams you wish to make versionable.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_make_namespace_versionable your_namespace',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
   $items['ucla_migrate_mets'] = array(
     'callback' => 'ucla_migration_migrate_mets',
-    'description' => 'Ingest content from METS record.',
+    'description' => 'Ingest content from METS file for all records.',
     'arguments' => array(
       'file_path' => 'The file path to the METS file.',
       'fedora_namespace' => "The Fedora namespace to ingest everything under.",
+      'recovery_number' => "The numerical portion of the PID of the last ingested object.",
     ),
     'options' => array(),
     'examples' => array(
@@ -23,11 +48,136 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
+  $items['ucla_migrate_from_dmdid'] = array(
+    'callback' => 'ucla_migration_migrate_from_dmdid',
+    'description' => 'Ingest content from METS file for a single record.',
+    'arguments' => array(
+      'file_path' => 'The file path to the METS file.',
+      'fedora_namespace' => "The Fedora namespace to ingest the record under.",
+      'dmdid' => "The record ID provided in the MODS for this particular record.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_from_dmdid /home/dgiuser/21198-zz00294nxr.xml uclans 21198-zz002bzvvs',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
   return $items;
 }
 
 /**
- * Main function of this drush script.
+ * Saves all pids in a Fedora namespace to a file.
+ *
+ * This is done so ucla_make_namespace_versionable can have a list of all pids
+ * for the given namespace after Fedora's resource index gets disabled.  Output
+ * file is written to the ucla_migration module folder.  It is given the name
+ * of the fedora namespace and an extension of '.pid'.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace whose PIDS you want.
+ */
+function ucla_migration_save_pids_for_namespace($fedora_namespace) {
+  // Get a connection to Fedora.
+  $connection = islandora_get_tuque_connection();
+  $repo = $connection->repository;
+
+  // SPARQL query to get all objects in a given namespace.
+  $query =
+  "
+    SELECT ?obj
+    FROM <#ri>
+    WHERE {
+      ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
+      FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:'))
+    }
+  ";
+
+  // Execute the query.
+  $results = $repo->ri->sparqlQuery($query);
+
+  // Put all the pids in an array.
+  $pids = array();
+  foreach ($results as $result) {
+    array_push($pids, $result['obj']['value']);
+  }
+
+  // JSON encode the array and write it to a file.
+  $path = DRUPAL_ROOT . '/' . drupal_get_path('module', 'ucla_migration') . "/$fedora_namespace.pids";
+  $fp = fopen($path, 'w');
+  if (!$fp) {
+    drush_set_error("Can't open file to write",
+      "Cannot open file $path to write.  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    return;
+  }
+
+  if (!fwrite($fp, json_encode($pids))) {
+    drush_set_error("Can't write pids to file",
+      "Cannot write pids to $path.  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    fclose($fp);
+    return;
+  }
+
+  fclose($fp);
+  return;
+}
+
+/**
+ * Sets all datastreams for all objects in a Fedora namespace to versionable.
+ *
+ * Reads in the output of ucla_migration_save_pids_for_namespace because this
+ * cannot be run with Fedora's resource index enabled.  Be sure to execute the
+ * ucla_save_pids_for_namespace Drush command first, then disable the resource
+ * index and restart Fedora.  Then run this command.  Then re-enable the
+ * resource index and restart Fedora again.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace whose datastreams you want to fix.
+ */
+function ucla_migration_make_all_datastreams_versionable($fedora_namespace) {
+  // Open up the pid file to read.
+  $path = DRUPAL_ROOT . '/' . drupal_get_path('module', 'ucla_migration') . "/$fedora_namespace.pids";
+  $fp = fopen($path, 'r');
+
+  if (!$fp) {
+    drush_set_error("Can't open file to read",
+      "Cannot open file $path to read.  Does it exist?  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    return;
+  }
+
+  // Grab its contents.
+  $contents = fread($fp, filesize($path));
+  if (!$contents) {
+    drush_set_error("Can't read file contents.",
+      "Cannot read contents of $path.  Does it exist?  Check your permissions for the ucla_migration module folder or run this script using sudo.",
+      "Error: "
+    );
+    fclose($fp);
+    return;
+  }
+
+  // Close the file pointer so we're not leaking all over the place.
+  fclose($fp);
+
+  // JSON decode the array of pids.
+  $pids = json_decode($contents);
+
+  // Set each datastream for each object in the namespace to versionable.
+  foreach ($pids as $pid) {
+    $obj = islandora_object_load($pid);
+    foreach ($obj as $dsid => $dsObj) {
+      $dsObj->versionable = TRUE;
+    }
+  }
+}
+
+/**
+ * Migrates all records in a METS file.
  *
  * Executes the migration based on a mets file.  Can recover a previously
  * failed ingest if the numeric portion of the last successfully ingested
@@ -203,6 +353,96 @@ function ucla_migration_recover_migration($mets_xml, $fedora_namespace, $recover
 }
 
 /**
+ * Migrates a single object based on record ID.
+ *
+ * @param string $file_path
+ *   The path to the mets file serving as the manifest for this ingest.
+ *
+ * @param string $fedora_namespace
+ *   The Fedora namespace to ingest everything under.
+ *
+ * @param string $dmdid
+ *   The record ID provided in the MODS for the record to migrate.
+ */
+function ucla_migration_migrate_from_dmdid($file_path, $fedora_namespace, $dmdid) {
+  // Check to make sure the path to the mets file has been provided.
+  if (!isset($file_path)) {
+    drush_set_error('File path not provided',
+      'Path to mets file not provided as command line argument',
+      'Error: ');
+    return;
+  }
+
+  // Attempt to grab the mets file.
+  $mets_file = file_get_contents($file_path);
+  if (!$mets_file) {
+    drush_set_error('File not found',
+      "Could not locate mets file $file_path",
+      "Error: ");
+    return;
+  }
+
+  $mets_xml = simplexml_load_string($mets_file);
+
+  // Register namespaces of the root element.
+  $xml_namespaces = $mets_xml->getDocNamespaces();
+  $mets_xml->registerXPathNamespace('mets', $xml_namespaces['mets']);
+  $mets_xml->registerXPathNamespace('xlink', $xml_namespaces['xlink']);
+
+  // Get the collection object.
+  // Probably a bad assumption, but it'll work for now.
+  $collection = islandora_object_load($fedora_namespace . ":1");
+
+  if (!$collection) {
+    drush_set_error('No Collection Object',
+      'Could not load collection object.  Perhaps the fedora namespace is wrong, or the collection object is not the first object in the namespace.',
+      'Error: ');
+    return;
+  }
+
+  // Query for the tiff file.
+  $dmdid = "DMD-" . $dmdid;
+  $image_query = "//mets:div[@TYPE='Image' and @DMDID='$dmdid']";
+  $image_array = $mets_xml->xpath($image_query);
+
+  // Validate results.
+  if (!is_array($image_array)) {
+    drush_set_error('XPath Error',
+      "Error in XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  if (empty($image_array)) {
+    drush_set_error('XPath Error',
+      "No results for XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  if (count($image_array) > 1) {
+    drush_set_error('XPath Error',
+      "Multiple results for XPath query $image_query",
+      "Error: ");
+    return;
+  }
+
+  $results = ucla_migration_migrate_child_object($fedora_namespace, $image_array[0], $mets_xml, $collection);
+
+  // Final message to user.
+  if (!$results) {
+    drush_set_error('Migration error',
+      "Error migrating object from dmdid $dmdid",
+      "Error: ");
+    return;
+  }
+
+  drush_log("Migration success.  Check watchdog logs for more information.", 'ok');
+
+  return;
+}
+
+/**
  * Migrates the main collection object for the provided mets xml.
  *
  * @param string $fedora_namespace
@@ -374,7 +614,7 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
  *   The collection this child will be a member of.
  *
  * @return bool
- *   Returns TRUE if succesfull, FALSE if error.
+ *   Returns TRUE if succesful, FALSE if error.
  */
 function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $collection) {
   // Get all the children objects.  Each one will correspond to a tiff file.
@@ -393,6 +633,12 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
       $image_array[$i],
       $mets_xml,
       $collection);
+    if ($ingest_success) {
+      watchdog('UCLA Migration',
+        'Migrated object @idx out of @total',
+        array('@idx' => $i + 1, '@total' => count($image_array)),
+        WATCHDOG_INFO);
+    }
   }
 
   // Exit if ingest of any child object failed.
@@ -424,7 +670,7 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
  *   The last successfully ingested object from the previous migration attempt.
  *
  * @return bool
- *   Returns TURE if successfull, FALSE if there is an error.
+ *   Returns TRUE if successful, FALSE if there is an error.
  */
 function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $collection, $last_good_object, $starting_pid) {
   // Try to delete the object AFTER the last successfully ingested object.  If
@@ -468,6 +714,12 @@ function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $co
       $image_array[$i],
       $mets_xml,
       $collection);
+    if ($ingest_success) {
+      watchdog('UCLA Migration',
+        'Migrated object @idx / @total',
+        array('@idx' => $i + 1, '@total' => count($image_array)),
+        WATCHDOG_INFO);
+    }
   }
 
   // Exit if ingest of any child object failed.
@@ -634,7 +886,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($fptr_section->count() == 0) {
     watchdog('UCLA Migration',
       "Could not locate fptr element for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -642,7 +894,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($fptr_section->count() > 1) {
     watchdog('UCLA Migration',
       "Multiple fptr elements for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -718,7 +970,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($mods_element->count() == 0) {
     watchdog('UCLA Migration',
       "Could not locate mods element for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -726,7 +978,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if ($mods_element->count() > 1) {
     watchdog('UCLA Migration',
       "Multiple mods elements for @id in the METS.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -753,14 +1005,14 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
   if (!$ingest_results) {
     watchdog('UCLA Migration',
       "Ingest for the child object @id has failed.",
-      array('@id' => $dmdid),
+      array('@id' => (string)$dmdid),
       WATCHDOG_ERROR);
     return FALSE;
   }
 
   watchdog('UCLA Migration',
-    "Ingested @id.",
-    array('@id' => $child->id),
+    'Ingested @id as @pid',
+    array('@id' => (string)$dmdid, '@pid' => $ingest_results->id),
     WATCHDOG_INFO);
 
   // Return the ingested object.
