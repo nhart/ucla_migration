@@ -76,6 +76,22 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
+  $items['ucla_migrate_attach_datastream'] = array(
+    'callback' => 'ucla_migration_attach_datastream',
+    'description' => 'Ingest content from METS file to update datastreams to objects that already exist in Fedora.',
+    'arguments' => array(
+      'datastream_path' => 'The file path to the file containing paths to the assets.',
+      'datastream_id' => 'The datastream id to assign to the added asset, will also be used for the ds label',
+      'mime_type' => 'The mime type to add to the attached datastream',
+      'fedora_namespace' => 'The Fedora namespace to update the datastreams under.',
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_attach_datastream http://example.com/datastream_file_of_assets PDF_FILE application/pdf edu.ucla.library.project ',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+  
   return $items;
 }
 
@@ -1091,9 +1107,8 @@ function ucla_migration_get_value_from_datastream($pid, $datastream_id, $xpath_q
  * @return type
  * 
  */
-
 function ucla_migration_migrate_datastream($mets_file_path, $datastream_path, $fedora_namespace) {
-  
+
 
 // Check to make sure the path to the mets file has been provided.
   if (!isset($mets_file_path)) {
@@ -1162,7 +1177,7 @@ function ucla_evaluate_mods_record_to_ingest($mods_simple_xml, $pid_ark_map) {
   if (array_key_exists($ark_identifier, $pid_ark_map)) {
     return TRUE;
   }
-  
+
   return FALSE;
 }
 
@@ -1205,18 +1220,131 @@ function ucla_migration_mets_file_to_xml_object($mets_file) {
   return $mets_xml;
 }
 
-function ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $mime_type, $datastream_content) {
+function ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $mime_type, $datastream_content, $content_from_file = 0) {
   $fedora_object = islandora_object_load($fedora_pid);
 
   if (!is_null($fedora_object)) {
-    $fedora_object->purgeDatastream("TRANSLATION");
     $fedora_object->purgeDatastream("$datastream_id");
 
     $datastream = $fedora_object->constructDatastream($datastream_id, 'M');
     $datastream->label = "$datastream_id";
     $datastream->mimetype = "$mime_type";
-    $datastream->setContentFromString($datastream_content);
-
+    
+    if($content_from_file != 0) {
+      $datastream->setContentFromFile($datastream_content);
+    } else {
+      $datastream->setContentFromString($datastream_content);
+    }
+    
     $fedora_object->ingestDatastream($datastream);
   }
+}
+
+/**
+ * 
+ * Updates a specific datastream rather than importing all digital assets
+ * associated with an item. The entries in the $datastream_path file should
+ * contain a path to the digital asset to add. This filename will contain the
+ * item ark, which is used to match the digital asset to the Fedora object to
+ * add the content to.
+ * 
+ * 
+ * @param type $datastream_path
+ *  The path to the plain text file containing a path to the digital asset to be
+ *  loaded. One path per line.
+ * 
+ * @param type $datastream_id
+ * The datastream Id to attach to this content when adding to the Fedora object,
+ * this will also be used for the label value.
+ * 
+ * @param type $mime_type
+ * This is the mime type to attach to the data stream
+ * 
+ * @param type $fedora_namespace
+ *  The Fedora Namespace you want to update the datastream for. Example:
+ *  Supplying com.example.namespace, will examine each item in this namespace
+ *  and look for a related datastream to attach
+ * 
+ * @return type
+ * 
+ */
+function ucla_migration_attach_datastream($datastream_path, $datastream_id,  $mime_type, $fedora_namespace) {
+
+  if (!isset($datastream_path)) {
+    drush_set_error('File path not provided', 'A path to the file containing the assets to load must be added', 'Error: ');
+    return;
+  }
+  
+  if (!isset($datastream_id)) {
+    drush_set_error('Datastream Id not provided', 'A datastream id to apply to the asset is required', 'Error: ');
+    return;
+  }
+  
+  if (!isset($mime_type)) {
+    drush_set_error('Mime type not provided', 'A Mime type for this added asset is required', 'Error: ');
+    return;
+  }
+  
+  if (!isset($fedora_namespace)) {
+    drush_set_error('Namespace not provided', 'A namespace to match the assets to is required', 'Error: ');
+    return;
+  }
+  
+
+  // Attempt to grab the file containing list of content locations
+  $datastream_asset_file = file($datastream_path);
+  
+  if (!$datastream_asset_file) {
+    drush_set_error('File not found', "Could not locate mets file $datastream_path", "Error: ");
+    return;
+  }
+  
+  // Use the MODS datastream with a pointer to the recordIdentifer as the source
+  // to generate the ark to pid mapping
+  
+  $datastream_containing_id = 'MODS';
+  $xpath_query = '//mods:mods/mods:recordInfo/mods:recordIdentifier';
+  $pid_map = ucla_migration_create_id_to_pid_map($fedora_namespace, $datastream_containing_id, $xpath_query);
+  
+  for ($i = 0; $i < sizeof($datastream_asset_file); $i++) {
+    
+    $file_to_get = chop($datastream_asset_file[$i]);
+    $remote_ark = ucla_migration_get_ark_from_filename($file_to_get);
+    $fedora_pid = $pid_map[$remote_ark];
+    
+    if(isset($fedora_pid)) {
+      $file_to_attach = file_get_contents($file_to_get);
+      
+      if($file_to_attach) {
+        print("attaching file with " . $fedora_pid . " " . $datastream_id . " " . $mime_type . " path " . $file_to_get . "\n");
+        
+        ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $mime_type, $file_to_get, 1); 
+        
+        $fedora_object = islandora_object_load($fedora_pid);
+        if (!is_null($fedora_object)) {
+          
+          // Should abstract this out somehow for the user, all derivative ds
+          // must be removed before re-generated. If not removed, the function 
+          // does NOT overwrite the datastreams
+                    
+          $fedora_object->purgeDatastream("TN");
+          $fedora_object->purgeDatastream("PREVIEW");
+          
+          islandora_pdf_islandora_sp_pdf_islandora_object_ingested($fedora_object);
+        }
+      }
+    }
+  }
+}
+
+function ucla_migration_get_ark_from_filename($filename) {
+    $ucla_naan = "21198";
+    
+    // Extract ark from filename, assuming naming convention of DLCS
+    $ark_start_pos = strpos($filename, $ucla_naan);
+    $ucla_naan_end_pos = $ark_start_pos + 6;
+    $ark_end_pos = strpos($filename, "-", $ucla_naan_end_pos);
+    $ark_value = substr($filename, $ark_start_pos, $ark_end_pos - $ark_start_pos);
+    
+    return $ark_value;
 }
