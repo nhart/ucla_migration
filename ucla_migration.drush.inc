@@ -92,6 +92,44 @@ function ucla_migration_drush_command() {
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
   
+  $items['ucla_migrate_attach_datastream'] = array(
+    'callback' => 'ucla_migration_attach_datastream',
+    'description' => 'Ingest content from a specified source to update datastreams to objects that already exist in Fedora.',
+    'arguments' => array(
+      'datastream_path' => 'The file path to the file containing paths to the assets.',
+      'datastream_id' => 'The datastream id to assign to the added asset, will also be used for the ds label',
+      'mime_type' => 'The mime type to add to the attached datastream',
+      'fedora_namespace' => 'The Fedora namespace to update the datastreams under.',
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_attach_datastream http://example.com/datastream_file_of_assets PDF_FILE application/pdf edu.ucla.library.project ',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+  
+  $items['ucla_migrate_delete_datastream'] = array(
+    'callback' => 'ucla_migration_delete_datastream',
+    'description' => 'Delete a datastream given a datastream id and options for deletion.',
+    'options' => array(
+      'datastream_id' => array( 
+        'description' => 'The datastream id to assign to the added asset, will also be used for the ds label',
+        'required' => 'true'),
+        
+        'pid_numbers' => array( 
+        'description' => 'The numeric values to combine with the namespace to generate pids to take action on',
+        'required' => 'true'),
+      
+      'fedora_namespace' => array(
+        'description' => 'The Fedora namespace to update the datastreams under.',
+        'required' => 'true'),
+    ),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_delete_datastream',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+  
   return $items;
 }
 
@@ -1316,8 +1354,6 @@ function ucla_migration_attach_datastream($datastream_path, $datastream_id,  $mi
       $file_to_attach = file_get_contents($file_to_get);
       
       if($file_to_attach) {
-        print("attaching file with " . $fedora_pid . " " . $datastream_id . " " . $mime_type . " path " . $file_to_get . "\n");
-        
         ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $mime_type, $file_to_get, 1); 
         
         $fedora_object = islandora_object_load($fedora_pid);
@@ -1347,4 +1383,58 @@ function ucla_migration_get_ark_from_filename($filename) {
     $ark_value = substr($filename, $ark_start_pos, $ark_end_pos - $ark_start_pos);
     
     return $ark_value;
+}
+
+function ucla_migration_delete_datastream() {
+  
+  $datastream_id = drush_get_option('datastream_id');
+  $fedora_namespace = drush_get_option('fedora_namespace');
+  $pid_numbers = drush_get_option('pid_numbers');
+  
+}
+
+
+/**
+ * 
+ *  Given a string value representing ranges and single numbers, extracts and
+ *  converts the input into a single array containing unique values.
+ *  Example input: 1,2-5,10-12
+ *  Return array: 1,2,3,4,5,10,11,12
+ * 
+ * 
+ * @param type $range_values
+ *  A string containing single numeric values and ranges of values, separated
+ *  by a comma. Ranges are designated by a dash '-'
+ * 
+ * 
+ * @return type $pid_numbers
+ *  An array containing a unique list of values extracted from the input range
+ * 
+ */
+
+function _parse_number_range($range_values) {
+  
+  $number_chunks = split(",", $range_values);
+  $pid_numbers = array();
+
+  foreach ($number_chunks as $number_chunk) {
+    $range_value = split("-", $number_chunk);
+    
+    if(sizeof($range_value) == 1) {
+      if(is_numeric($range_value[0])) {
+        array_push($pid_numbers, $range_value[0]);
+      } 
+    }
+    
+    if(sizeof($range_value) == 2) {
+      if(is_numeric($range_value[0]) && is_numeric($range_value[1])) {
+        foreach(range($range_value[0], $range_value[1]) as $val) {
+          array_push($pid_numbers, $val);
+        }
+      } 
+    }
+  }
+  $pid_numbers = array_unique($pid_numbers);
+  
+  return $pid_numbers;
 }
