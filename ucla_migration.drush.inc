@@ -91,7 +91,7 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
-  
+
   $items['ucla_migrate_attach_datastream'] = array(
     'callback' => 'ucla_migration_attach_datastream',
     'description' => 'Ingest content from a specified source to update datastreams to objects that already exist in Fedora.',
@@ -107,19 +107,17 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
-  
+
   $items['ucla_migrate_delete_datastream'] = array(
     'callback' => 'ucla_migration_delete_datastream',
     'description' => 'Delete a datastream given a datastream id and options for deletion.',
     'options' => array(
-      'datastream_id' => array( 
+      'datastream_id' => array(
         'description' => 'The datastream id to assign to the added asset, will also be used for the ds label',
         'required' => 'true'),
-        
-        'pid_numbers' => array( 
+      'pid_numbers' => array(
         'description' => 'The numeric values to combine with the namespace to generate pids to take action on',
         'required' => 'true'),
-      
       'fedora_namespace' => array(
         'description' => 'The Fedora namespace to update the datastreams under.',
         'required' => 'true'),
@@ -129,7 +127,7 @@ function ucla_migration_drush_command() {
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
-  
+
   return $items;
 }
 
@@ -1267,13 +1265,14 @@ function ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $m
     $datastream = $fedora_object->constructDatastream($datastream_id, 'M');
     $datastream->label = "$datastream_id";
     $datastream->mimetype = "$mime_type";
-    
-    if($content_from_file != 0) {
+
+    if ($content_from_file != 0) {
       $datastream->setContentFromFile($datastream_content);
-    } else {
+    }
+    else {
       $datastream->setContentFromString($datastream_content);
     }
-    
+
     $fedora_object->ingestDatastream($datastream);
   }
 }
@@ -1306,66 +1305,66 @@ function ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $m
  * @return type
  * 
  */
-function ucla_migration_attach_datastream($datastream_path, $datastream_id,  $mime_type, $fedora_namespace) {
+function ucla_migration_attach_datastream($datastream_path, $datastream_id, $mime_type, $fedora_namespace) {
 
   if (!isset($datastream_path)) {
     drush_set_error('File path not provided', 'A path to the file containing the assets to load must be added', 'Error: ');
     return;
   }
-  
+
   if (!isset($datastream_id)) {
     drush_set_error('Datastream Id not provided', 'A datastream id to apply to the asset is required', 'Error: ');
     return;
   }
-  
+
   if (!isset($mime_type)) {
     drush_set_error('Mime type not provided', 'A Mime type for this added asset is required', 'Error: ');
     return;
   }
-  
+
   if (!isset($fedora_namespace)) {
     drush_set_error('Namespace not provided', 'A namespace to match the assets to is required', 'Error: ');
     return;
   }
-  
+
 
   // Attempt to grab the file containing list of content locations
   $datastream_asset_file = file($datastream_path);
-  
+
   if (!$datastream_asset_file) {
     drush_set_error('File not found', "Could not locate mets file $datastream_path", "Error: ");
     return;
   }
-  
+
   // Use the MODS datastream with a pointer to the recordIdentifer as the source
   // to generate the ark to pid mapping
-  
+
   $datastream_containing_id = 'MODS';
   $xpath_query = '//mods:mods/mods:recordInfo/mods:recordIdentifier';
   $pid_map = ucla_migration_create_id_to_pid_map($fedora_namespace, $datastream_containing_id, $xpath_query);
-  
+
   for ($i = 0; $i < sizeof($datastream_asset_file); $i++) {
-    
+
     $file_to_get = chop($datastream_asset_file[$i]);
     $remote_ark = ucla_migration_get_ark_from_filename($file_to_get);
     $fedora_pid = $pid_map[$remote_ark];
-    
-    if(isset($fedora_pid)) {
+
+    if (isset($fedora_pid)) {
       $file_to_attach = file_get_contents($file_to_get);
-      
-      if($file_to_attach) {
-        ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $mime_type, $file_to_get, 1); 
-        
+
+      if ($file_to_attach) {
+        ucla_migration_add_datastream_to_object($fedora_pid, $datastream_id, $mime_type, $file_to_get, 1);
+
         $fedora_object = islandora_object_load($fedora_pid);
         if (!is_null($fedora_object)) {
-          
+
           // Should abstract this out somehow for the user, all derivative ds
           // must be removed before re-generated. If not removed, the function 
           // does NOT overwrite the datastreams
-                    
+
           $fedora_object->purgeDatastream("TN");
           $fedora_object->purgeDatastream("PREVIEW");
-          
+
           islandora_pdf_islandora_sp_pdf_islandora_object_ingested($fedora_object);
         }
       }
@@ -1374,25 +1373,70 @@ function ucla_migration_attach_datastream($datastream_path, $datastream_id,  $mi
 }
 
 function ucla_migration_get_ark_from_filename($filename) {
-    $ucla_naan = "21198";
-    
-    // Extract ark from filename, assuming naming convention of DLCS
-    $ark_start_pos = strpos($filename, $ucla_naan);
-    $ucla_naan_end_pos = $ark_start_pos + 6;
-    $ark_end_pos = strpos($filename, "-", $ucla_naan_end_pos);
-    $ark_value = substr($filename, $ark_start_pos, $ark_end_pos - $ark_start_pos);
-    
-    return $ark_value;
+  $ucla_naan = "21198";
+
+  // Extract ark from filename, assuming naming convention of DLCS
+  $ark_start_pos = strpos($filename, $ucla_naan);
+  $ucla_naan_end_pos = $ark_start_pos + 6;
+  $ark_end_pos = strpos($filename, "-", $ucla_naan_end_pos);
+  $ark_value = substr($filename, $ark_start_pos, $ark_end_pos - $ark_start_pos);
+
+  return $ark_value;
 }
+
+
+/**
+ * 
+ *  Given Datastream ID, namespace, and range of numbers, delete the datastream
+ * `from these Fedora objects
+ *  Example input: DS_TO_DELETE, my.object.namespace, 1,2-5,10-12
+ *  Return array: 1,2,3,4,5,10,11,12
+ * 
+ *  The options are not passed as function parameters, but rather as drush
+ *  command line options
+ * 
+ * @param type $datastream_id
+ *  The datastream id of the dsid you wish to delete from the objects
+ * 
+ * @param type $fedora_namespace
+ *  The namespace base that will be used, along with the number range, to
+ *  generate the pids to remove
+ * 
+ * @param type $pid_numbers
+ *  A string containing single numeric values and ranges of values, separated
+ *  by a comma. Ranges are designated by a dash '-'
+ * 
+ * 
+ * @return type 
+ * 
+ */
 
 function ucla_migration_delete_datastream() {
-  
-  $datastream_id = drush_get_option('datastream_id');
-  $fedora_namespace = drush_get_option('fedora_namespace');
-  $pid_numbers = drush_get_option('pid_numbers');
-  
-}
 
+  $dsid = drush_get_option('datastream_id');
+  $fedora_namespace = drush_get_option('fedora_namespace');
+  $pid_range = drush_get_option('pid_numbers');
+
+  $parse_pids = _parse_number_range($pid_range);
+  $delete_count = 0;
+  
+  foreach ($parse_pids as $parse_pid) {
+    $full_name = $fedora_namespace . ":" . $parse_pid;
+    $fedora_object = islandora_object_load($full_name);
+
+    if ($fedora_object) {
+      $result_code = $fedora_object->purgeDatastream($dsid);
+      $result_text = 'Failure';
+      
+      if($result_code == 1) {
+        $result_text = 'Success';
+        $delete_count++;
+      }
+      drush_log("Delete {$dsid} datastream from {$full_name} - Result : {$result_text}", 'ok');
+    }
+  }
+  drush_log("Deleted {$dsid} from {$delete_count} total objects", 'ok');
+}
 
 /**
  * 
@@ -1411,30 +1455,30 @@ function ucla_migration_delete_datastream() {
  *  An array containing a unique list of values extracted from the input range
  * 
  */
-
 function _parse_number_range($range_values) {
-  
+
+  print($range_values . " inside");
   $number_chunks = split(",", $range_values);
   $pid_numbers = array();
 
   foreach ($number_chunks as $number_chunk) {
     $range_value = split("-", $number_chunk);
-    
-    if(sizeof($range_value) == 1) {
-      if(is_numeric($range_value[0])) {
+
+    if (sizeof($range_value) == 1) {
+      if (is_numeric($range_value[0])) {
         array_push($pid_numbers, $range_value[0]);
-      } 
+      }
     }
-    
-    if(sizeof($range_value) == 2) {
-      if(is_numeric($range_value[0]) && is_numeric($range_value[1])) {
-        foreach(range($range_value[0], $range_value[1]) as $val) {
+
+    if (sizeof($range_value) == 2) {
+      if (is_numeric($range_value[0]) && is_numeric($range_value[1])) {
+        foreach (range($range_value[0], $range_value[1]) as $val) {
           array_push($pid_numbers, $val);
         }
-      } 
+      }
     }
   }
   $pid_numbers = array_unique($pid_numbers);
-  
+
   return $pid_numbers;
 }
