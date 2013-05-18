@@ -1457,7 +1457,6 @@ function ucla_migration_delete_datastream() {
  */
 function _parse_number_range($range_values) {
 
-  print($range_values . " inside");
   $number_chunks = split(",", $range_values);
   $pid_numbers = array();
 
