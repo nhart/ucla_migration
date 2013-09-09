@@ -564,7 +564,7 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
   // Create the NewFedoraObject for the collection.
   $collection = ucla_migration_create_collection_object(
-      $fedora_namespace, $collection_label, $collection_mods->asXML());
+      $fedora_namespace, $collection_label, $mods_string);
 
   // Ingest the NewFedoraObject.
   $ingest_results = islandora_add_object($collection);
