@@ -9,26 +9,28 @@ Obviously, this script depends on Islandora, in particular the islandora module.
 Also, in order to generate FITS technical metadata, the islandora_fits module must be downloaded, enabled, and properly configured.  See https://github.com/Islandora/islandora_fits for more info.
 
 tl;dr
-* $ cd /var/www/html/drupal/sites/all/modules
-* $ drush dl dblog
-* $ drush en dblog
+
+Considering ${DRUPAL_HOME} as where you have Drupal installed and ${DRUPAL_USER} as the system user that Drupal runs as ('apache' on RHEL, 'www-data' on Ubuntu):
+
+* $ sudo -u ${DRUPAL_USER} drush -r ${DRUPAL_HOME} en dblog
 * $ cd ~
 * $ wget http://fits.googlecode.com/files/fits-0.6.1.zip
-* $ unzip fits-0.6.1.zip
-* $ sudo mv fits-0.6.1 /usr/share
-* $ cd /var/www/html/drupal/sites/all/modules
+* $ sudo unzip -d /usr/share fits-0.6.1.zip
+* $ sudo ln -s /usr/share/fits-0.6.1 /usr/share/fits
+* $ sudo chown -R ${DRUPAL_USER}:${DRUPAL_USER} /usr/share/fits-0.6.1
+* $ cd ${DRUPAL_HOME}/sites/all/modules
 * $ git clone https://github.com/Islandora/islandora_fits
-* $ sudo drush en islandora_fits
-* Go to your site's admin/islandora/fits page and set the path to the fits file to be /usr/share/fits-0.6.1/fits.sh
+* $ sudo -u ${DRUPAL_USER} drush -r ${DRUPAL_HOME} en islandora_fits
+* Go to your site's admin/islandora/fits page and set the path to the fits file to be /usr/share/fits/fits.sh
 
 Installation
 ------------
 Clone this module into your server's sites/all/modules folder.  Then enable using either Drupal's admin interface or Drush.
 
 tl;dr
-* $ cd /var/www/html/drupal/sites/all/modules
+* $ cd ${DRUPAL_HOME}/sites/all/modules
 * $ git clone https://github.com/discoverygarden/ucla_migration.git
-* $ drush en ucla_migration
+* $ sudo -u ${DRUPAL_USER} drush -r ${DRUPAL_HOME} en ucla_migration
 
 Usage
 ----
