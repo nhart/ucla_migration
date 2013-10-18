@@ -128,6 +128,20 @@ function ucla_migration_drush_command() {
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
 
+  $items['ucla_migrate_min_metadata'] = array(
+    'callback' => 'minimum_metadata_ingest',
+    'description' => 'Ingest content given digital assets but no metadata files.',
+    'arguments' => array(
+      'fedora_namespace' => "The Fedora namespace to ingest everything under.",
+      'manifest_file_path' => "The path to the file containing a list of assets to ingest.",
+    ),
+    'options' => array(),
+    'examples' => array(
+      'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_min_medatata fedoranamespace /path/to/manifest/file.txt',
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+
   return $items;
 }
 
@@ -1384,7 +1398,6 @@ function ucla_migration_get_ark_from_filename($filename) {
   return $ark_value;
 }
 
-
 /**
  * 
  *  Given Datastream ID, namespace, and range of numbers, delete the datastream
@@ -1410,7 +1423,6 @@ function ucla_migration_get_ark_from_filename($filename) {
  * @return type 
  * 
  */
-
 function ucla_migration_delete_datastream() {
 
   $dsid = drush_get_option('datastream_id');
@@ -1419,7 +1431,7 @@ function ucla_migration_delete_datastream() {
 
   $parse_pids = _parse_number_range($pid_range);
   $delete_count = 0;
-  
+
   foreach ($parse_pids as $parse_pid) {
     $full_name = $fedora_namespace . ":" . $parse_pid;
     $fedora_object = islandora_object_load($full_name);
@@ -1427,8 +1439,8 @@ function ucla_migration_delete_datastream() {
     if ($fedora_object) {
       $result_code = $fedora_object->purgeDatastream($dsid);
       $result_text = 'Failure';
-      
-      if($result_code == 1) {
+
+      if ($result_code == 1) {
         $result_text = 'Success';
         $delete_count++;
       }
@@ -1481,3 +1493,128 @@ function _parse_number_range($range_values) {
 
   return $pid_numbers;
 }
+
+/**
+ * 
+ *  A function to provide minimum metadata data for ingest of large numbers of 
+ *  assets. Content type will be assumed based on the extension
+ * 
+ *  TIF - Will use a large image content model
+ *  PDF - Will use the basic PDF content model
+ * 
+ *  The metadata attached to the content will be a MODS record containing the 
+ *  following values
+ * 
+ *  title : The filename of the file ingested
+ *  identifier : The filename of the file ingested  
+ * 
+ *  Both these values will be crosswalked to DC and available via triplestore 
+ *  query
+ * 
+ * @param type $fedora_namespace
+ *  The namespace in Fedora to relate as the collection parent for the minimal
+ *  import
+ * 
+ * 
+ * @return type $manifest_file
+ *  A path to a file containing a file path to a single asset on each line
+ * 
+ */
+function minimum_metadata_ingest($fedora_namespace, $manifest_file_path) {
+
+  if (!isset($manifest_file_path)) {
+    drush_set_error('File path not provided', 'Path to the manifest file not provided as command line argument', 'Error: ');
+    return;
+  }
+
+  $manifest_file = file($manifest_file_path);
+  if (!$manifest_file) {
+    drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
+    return;
+  }
+
+  if (!isset($fedora_namespace)) {
+    drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
+    return;
+  }
+
+  $collection = islandora_object_load($fedora_namespace . ":1");
+  
+  foreach ($manifest_file as $file_path) {
+    $file_path = trim($file_path);
+    
+    if(fopen($file_path, "r")) {
+      
+      $file_name = basename($file_path);
+      $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
+      $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
+      _add_datastream_to_object($fedora_object, $file_path);
+      $ingest_results = islandora_add_object($fedora_object);
+    }
+  }
+}
+
+/**
+ * Determines datastream format based on Mime type and calls the appropriate 
+ * function to attach the content
+ *
+ * @param FedoraObject $object
+ *   The object you wish to add the datastream to.
+ *
+ * @param string $file_path
+ *   Valid path to a file to be added as a datastream.
+ */
+function _add_datastream_to_object($object, $file_path) {
+  
+  $ext = pathinfo($file_path, PATHINFO_EXTENSION);
+
+  if($ext === 'tiff') {
+    _add_tiff_to_object($object, $file_path);
+  }
+  
+  if($ext === 'application/pdf') {
+    _add_pdf_to_object($object, $file_path);
+  }
+  
+  return $object;
+  
+}
+
+
+/**
+ * Adds a tiff to the supplied object as the OBJ datastream.
+ *
+ * @param FedoraObject $object
+ *   The object you wish to add the datastream to.
+ *
+ * @param string $tiff_path
+ *   Valid path to a tiff file.
+ */
+function _add_tiff_to_object($object, $tiff_path) {
+  $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
+  $datastream = $object->constructDatastream('OBJ', 'M');
+  $datastream->label = "High Quality Tiff";
+  $datastream->mimetype = "image/tiff";
+  $datastream->setContentFromFile($tiff_path);
+  $object->ingestDatastream($datastream);
+}
+
+/**
+ * Adds a PDF to the supplied object as the OBJ datastream.
+ *
+ * @param FedoraObject $object
+ *   The object you wish to add the datastream to.
+ *
+ * @param string $pdf_path
+ *   Valid path to a pdf file.
+ */
+function _add_pdf_to_object($object, $pdf_path) {
+  $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_pdf');
+  $datastream = $object->constructDatastream('OBJ', 'M');
+  $datastream->label = "PDF Document";
+  $datastream->mimetype = "application/pdf";
+  $datastream->setContentFromFile($pdf_path);
+  $object->ingestDatastream($datastream);
+}
+
+
