@@ -131,11 +131,17 @@ function ucla_migration_drush_command() {
   $items['ucla_migrate_min_metadata'] = array(
     'callback' => 'minimum_metadata_ingest',
     'description' => 'Ingest content given digital assets but no metadata files.',
-    'arguments' => array(
-      'fedora_namespace' => "The Fedora namespace to ingest everything under.",
-      'manifest_file_path' => "The path to the file containing a list of assets to ingest.",
+    'options' => array(
+      'fedora_namespace' => array(
+        'description' => 'The Fedora namespace to update the datastreams under.',
+        'required' => 'true'),
+      'manifest_file_path' => array(
+        'description' => 'The path to the file containing a list of assets to ingest.',
+        'required' => 'true'),
+      'overwrite' => array(
+        'description' => 'If true, remove existing Fedora objects in the namespace with the same filename/title.',
+        'required' => 'true'),
     ),
-    'options' => array(),
     'examples' => array(
       'simple example' => 'drush -u 1 -l http://example.com ucla_migrate_min_medatata fedoranamespace /path/to/manifest/file.txt',
     ),
@@ -1515,17 +1521,20 @@ function _parse_number_range($range_values) {
  *  The namespace in Fedora to relate as the collection parent for the minimal
  *  import
  * 
- * 
- * @return type $manifest_file
+ * @param type $manifest_file_path
  *  A path to a file containing a file path to a single asset on each line
  * 
+ * @param type $overwrite
+ *  If true, remove existing Fedora objects in this namespace with the same
+ * filename
+ * 
+ * 
  */
-function minimum_metadata_ingest($fedora_namespace, $manifest_file_path) {
+function minimum_metadata_ingest() {
 
-  if (!isset($manifest_file_path)) {
-    drush_set_error('File path not provided', 'Path to the manifest file not provided as command line argument', 'Error: ');
-    return;
-  }
+  $fedora_namespace = drush_get_option('fedora_namespace');
+  $manifest_file_path = drush_get_option('manifest_file_path');
+  $overwrite = drush_get_option('overwrite');
 
   $manifest_file = file($manifest_file_path);
   if (!$manifest_file) {
@@ -1538,18 +1547,35 @@ function minimum_metadata_ingest($fedora_namespace, $manifest_file_path) {
     return;
   }
 
+  if (!isset($overwrite)) {
+    drush_set_error('Overwrite flag not specified', '', 'Error: ');
+    return;
+  }
+
+
   $collection = islandora_object_load($fedora_namespace . ":1");
-  
+
   foreach ($manifest_file as $file_path) {
     $file_path = trim($file_path);
-    
-    if(fopen($file_path, "r")) {
+
+    if (_is_valid_extension($file_path)) {
       
-      $file_name = basename($file_path);
-      $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
-      $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
-      _add_datastream_to_object($fedora_object, $file_path);
-      $ingest_results = islandora_add_object($fedora_object);
+      if (fopen($file_path, "r")) {
+        
+        $file_name = basename($file_path);
+        $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
+        $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
+        _add_datastream_to_object($fedora_object, $file_path);
+        $ingest_results = islandora_add_object($fedora_object);
+      
+        
+        watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO); 
+     
+      }
+      else {
+        watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+     
+      }
     }
   }
 }
@@ -1565,21 +1591,43 @@ function minimum_metadata_ingest($fedora_namespace, $manifest_file_path) {
  *   Valid path to a file to be added as a datastream.
  */
 function _add_datastream_to_object($object, $file_path) {
-  
-  $ext = pathinfo($file_path, PATHINFO_EXTENSION);
 
-  if($ext === 'tiff') {
+  $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+
+
+  if ($ext === 'tiff') {
     _add_tiff_to_object($object, $file_path);
   }
-  
-  if($ext === 'application/pdf') {
+
+  if ($ext === 'pdf') {
     _add_pdf_to_object($object, $file_path);
   }
-  
+
   return $object;
-  
 }
 
+/**
+ * Based on the extension of a file, determine if this is a valid file to be
+ * ingested
+ *
+ * @param string $file_path
+ *   Path to a file to test extension
+ */
+function _is_valid_extension($file_path) {
+
+  $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+
+
+  if ($ext === 'tiff') {
+    return true;
+  }
+
+  if ($ext === 'pdf') {
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * Adds a tiff to the supplied object as the OBJ datastream.
@@ -1617,4 +1665,26 @@ function _add_pdf_to_object($object, $pdf_path) {
   $object->ingestDatastream($datastream);
 }
 
+/**
+ * Given a list of pids, purges the object from Fedora
+ *
+ * @param $list_of_pids
+ *   A list of pids for objects to be removed
+ * 
+ */
+function _purge_object_by_pid($pids) {
+
+  foreach ($pids as $pid) {
+    $fedora_obj = islandora_object_load($pid);
+
+    if ($fedora_obj) {
+      if (islandora_delete_object($fedora_obj)) {
+        drush_log("Successfully purged pid {$pid} ", 'ok');
+      }
+      else {
+        drush_log("Failure to purge pid {$pid} ", 'ok');
+      }
+    }
+  }
+}
 
