@@ -1536,6 +1536,7 @@ function minimum_metadata_ingest() {
   $manifest_file_path = drush_get_option('manifest_file_path');
   $overwrite = drush_get_option('overwrite');
 
+
   $manifest_file = file($manifest_file_path);
   if (!$manifest_file) {
     drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
@@ -1559,22 +1560,23 @@ function minimum_metadata_ingest() {
     $file_path = trim($file_path);
 
     if (_is_valid_extension($file_path)) {
-      
+
       if (fopen($file_path, "r")) {
-        
+
         $file_name = basename($file_path);
+
         $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
         $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
+
+
         _add_datastream_to_object($fedora_object, $file_path);
         $ingest_results = islandora_add_object($fedora_object);
-      
-        
-        watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO); 
-     
+
+
+        watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
       }
       else {
         watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
-     
       }
     }
   }
@@ -1686,5 +1688,40 @@ function _purge_object_by_pid($pids) {
       }
     }
   }
+}
+
+/**
+ * Given a Fedora namespace, return a title/label to pid mapping
+ * the given title and namespace in the triplestore
+ *
+ * @param string $fedora_namespace
+ *  The fedora namespace to search for the given title
+ * 
+ */
+function _create_pid_title_map_by_namespace($fedora_namespace) {
+
+  $connection = islandora_get_tuque_connection();
+  $repo = $connection->repository;
+  $query =
+      "
+        SELECT ?identifier ?label
+        FROM <#ri>
+        WHERE {
+          ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
+          FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
+          ?obj <fedora-model:label> ?label .
+          ?obj <dc:identifier> ?identifier .
+          }
+        ORDER BY ?identifier";
+
+  $results = $repo->ri->sparqlQuery($query);
+
+  $title_to_pid = array();
+
+  foreach ($results as $result) {
+    $title_to_pid[$result['label']['value']] = $result['identifier']['value'];
+  }
+
+  return $title_to_pid;
 }
 
