@@ -1557,10 +1557,13 @@ function minimum_metadata_ingest() {
   $collection = islandora_object_load($fedora_namespace . ":1");
 
   foreach ($manifest_file as $file_path) {
+    
     $file_path = trim($file_path);
-
+    
     if (_is_valid_extension($file_path)) {
-
+      
+      $file_path = _url_encode_http_address($file_path);
+      
       if (fopen($file_path, "r")) {
 
         $file_name = basename($file_path);
@@ -1596,6 +1599,9 @@ function _add_datastream_to_object($object, $file_path) {
 
   $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
 
+  if ($ext === 'tif') {
+    _add_tiff_to_object($object, $file_path);
+  }
 
   if ($ext === 'tiff') {
     _add_tiff_to_object($object, $file_path);
@@ -1618,8 +1624,11 @@ function _add_datastream_to_object($object, $file_path) {
 function _is_valid_extension($file_path) {
 
   $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
-
-
+  
+  if ($ext === 'tif') {
+    return true;
+  }
+  
   if ($ext === 'tiff') {
     return true;
   }
@@ -1725,3 +1734,18 @@ function _create_pid_title_map_by_namespace($fedora_namespace) {
   return $title_to_pid;
 }
 
+function _url_encode_http_address($address_to_encode) {
+  
+  $url_parsed = parse_url($address_to_encode);
+  $path_to_encode = $url_parsed['path'];
+  $sections_to_encode = explode('/', $path_to_encode);
+
+  for($i=0;$i<sizeof($sections_to_encode); $i++) {
+    $sections_to_encode[$i] = rawurlencode($sections_to_encode[$i]);
+  }
+  
+  $encoded_path = implode('/', $sections_to_encode);
+  $full_url = $url_parsed['scheme'] . '://' . $url_parsed['host'] . $encoded_path;
+  
+  return $full_url;
+}
