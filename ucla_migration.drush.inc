@@ -1489,7 +1489,7 @@ function ucla_migration_add_mods_to_object($object, $mods_txt) {
     $object->ingestDatastream($datastream);
 }
 
-function ucla_migration_add_genre_to_mods($object, $mods_txt $metadata_value){
+function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
     try {
         $xslt_proc = new XSLTProcessor();
 		if ($metadata_value == "video recordings") {
