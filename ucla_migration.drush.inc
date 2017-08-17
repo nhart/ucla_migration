@@ -642,7 +642,7 @@ function add_genre_to_MODS_for_namespace(){
             } else {
 
                 $mods_txt = $object['MODS']->content;
-                ucla_migration_add_genre_to_mods($object, $mods_txt, "first video genre");
+                ucla_migration_add_genre_to_mods($object, $mods_txt, "per_video_genre");
             }
         }
     }
@@ -1492,9 +1492,9 @@ function ucla_migration_add_mods_to_object($object, $mods_txt) {
 function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
     try {
         $xslt_proc = new XSLTProcessor();
-		if ($metadata_value == "video recordings") {
+		if ($metadata_value == "video_recordings") {
 		    $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_all_videos.xsl';
-		} elseif ($metadata_value == "digital moving image formats") {
+		} elseif ($metadata_value == "digital_moving_image_formats") {
 		   $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_diaspora2.xsl';
 		} else {
 		  $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods.xsl';
