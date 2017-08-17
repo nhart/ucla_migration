@@ -59,6 +59,19 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+	$items['ucla_fix_fedoraObject_metadata_by_pids'] = array(
+        'callback' => 'fix_fedoraObject_metadata_by_pids',
+        'description' => 'fix all the objects in a given pids to add genre',
+        'arguments' => array(
+            'pids' => "The PIDS you're looking for.",
+			'metadata_value' => "Value of genre that needs to be added to mods",
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 -l http://example.com ucla_fix_fedoraObject_metadata_by_pids pids metadata_value',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
     $items['ucla_update_Label_from_DC_for_namespace'] = array(
         'callback' => 'update_Label_from_DC_for_namespace',
         'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
@@ -427,6 +440,43 @@ function fix_fedoraObject_relsExt_by_pids() {
             }
             if ($hasModelManuscriptCModel == FALSE) {
                 $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:manuscriptCModel');
+            }
+        }
+    }
+}
+
+
+function fix_fedoraObject_metadata_by_pids() {
+    $pids = drush_get_option('pids');
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+    $metadata_value = drush_get_option('metadata_value');
+    if (!isset($pids)) {
+        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
+        return;
+    }
+
+    $pids_file = file($pids);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    foreach ($pids_file as $pid) {
+
+
+        $pid = trim($pid);
+        $object = islandora_object_load($pid);
+        if (isset($object)) {
+             if (!(isset($object['MODS']) && !empty($object['MODS']))) {
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+            } else {
+
+                $mods_txt = $object['MODS']->content;
+                ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value);
             }
         }
     }
@@ -1439,10 +1489,17 @@ function ucla_migration_add_mods_to_object($object, $mods_txt) {
     $object->ingestDatastream($datastream);
 }
 
-function ucla_migration_add_genre_to_mods($object, $mods_txt){
+function ucla_migration_add_genre_to_mods($object, $mods_txt $metadata_value){
     try {
         $xslt_proc = new XSLTProcessor();
-        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods.xsl';
+		if ($metadata_value == "video recordings") {
+		    $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_all_videos.xsl';
+		} elseif ($metadata_value == "digital moving image formats") {
+		   $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_diaspora2.xsl';
+		} else {
+		  $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods.xsl';
+		}
+        
         $xslt_dom = new DOMDocument();
         $xslt_dom->load($xslt_file);
         $xslt_proc->importStyleSheet($xslt_dom);
