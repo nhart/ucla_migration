@@ -642,7 +642,7 @@ function add_genre_to_MODS_for_namespace(){
             } else {
 
                 $mods_txt = $object['MODS']->content;
-                ucla_migration_add_genre_to_mods($object, $mods_txt);
+                ucla_migration_add_genre_to_mods($object, $mods_txt, "first video genre");
             }
         }
     }
