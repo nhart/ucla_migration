@@ -637,7 +637,7 @@ function update_Label_from_DC_for_namespace() {
  *
  * 
  */
-function update_Label_from_DC_for_pids() {
+function update_Label_from_DC_for_PIDS() {
     
     
     $pids = drush_get_option('pids');
