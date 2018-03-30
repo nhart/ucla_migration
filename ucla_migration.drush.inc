@@ -87,6 +87,22 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+    
+    $items['ucla_update_Label_from_DC_for_PIDS'] = array(
+        'callback' => 'update_Label_from_DC_for_PIDS',
+        'description' => 'update fedora label to the one from dc:title ',
+        'arguments' => array(
+            'pids' => array(
+                'description' => 'list of PIDS for which the labels need to be updated',
+                'required' => 'true'
+            ),
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 ucla_update_Label_from_DC_for_PIDS pids',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
 
     $items['ucla_update_DC_from_MODS_for_namespace'] = array(
         'callback' => 'update_DC_from_MODS_for_namespace',
@@ -99,10 +115,27 @@ function ucla_migration_drush_command() {
         ),
         'options' => array(),
         'examples' => array(
-            'simple example' => 'drush -u 1 -l http://example.com ucla_update_DC_from_MODS_for_namespace fedora_namespace',
+            'simple example' => 'drush -u 1  ucla_update_DC_from_MODS_for_namespace fedora_namespace',
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+    
+    $items['ucla_update_DC_from_MODS_for_PIDS'] = array(
+        'callback' => 'update_DC_from_MODS_for_PIDS',
+        'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
+        'arguments' => array(
+            'fedora_namespace' => array(
+                'description' => 'list of PIDS for which Mods metadata will be added to DC fields',
+                'required' => 'true'
+            ),
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1  ucla_update_DC_from_MODS_for_PIDS pids',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
+    
     $items['ucla_add_genre_to_MODS_for_namespace'] = array(
         'callback' => 'add_genre_to_MODS_for_namespace',
         'description' => 'add missing genre to dep mods',
@@ -453,7 +486,7 @@ function fix_fedoraObject_metadata_by_pids() {
         return;
     }
     $metadata_value = drush_get_option('metadata_value');
-    if (!isset($pids)) {
+    if (!isset($metadata_value)) {
         drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
         return;
     }
@@ -537,19 +570,19 @@ function ucla_migration_save_pids_for_namespace($fedora_namespace) {
     return;
 }
 
+
 /**
  *
  * @param type $fedora_namespace
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
- * @param type $manifest_file_path
- *  A path to a file containing a file path to a single asset on each line
- *
- * @param type $add_mods_flag
- *  Flag to ingest MODS datastream
+ * 
  */
 function update_Label_from_DC_for_namespace() {
+    
+    
+         
     $fedora_namespace = drush_get_option('fedora_namespace');
     if (!isset($fedora_namespace)) {
         drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
@@ -595,6 +628,65 @@ function update_Label_from_DC_for_namespace() {
         }
     }
 }
+
+/**
+ *
+ * @param type $fedora_namespace
+ *  The namespace in Fedora to relate as the collection parent for the
+ *  import
+ *
+ * 
+ */
+function update_Label_from_DC_for_pids() {
+    
+    
+    $pids = drush_get_option('pids');
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+    $metadata_value = drush_get_option('metadata_value');
+    if (!isset($metadata_value)) {
+        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
+        return;
+    }
+
+    $pids_file = file($pids);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    foreach ($pids_file as $pid) {
+        $pid = trim($pid);
+        $object = islandora_object_load($pid);
+        if (isset($object)) {
+            
+                
+                $dc_txt = $object['DC']->content;
+                $dc_xml = simplexml_load_string($dc_txt);
+    
+                // Register namespaces of the root element.
+                $xml_namespaces = $dc_xml->getDocNamespaces();
+                $dc_xml->registerXPathNamespace('oai_dc', $xml_namespaces['oai_dc']);
+                $dc_xml->registerXPathNamespace('dc', $xml_namespaces['dc']);
+                watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_ERROR);
+                $dc_query = "//dc:title[1]";
+                $dc_array = $dc_xml->xpath($dc_query);
+                watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_ERROR);
+    
+                $object->label = $dc_array[0]->__toString();
+
+                
+            
+        }
+    }
+    
+}
+
+
+
 
 function add_genre_to_MODS_for_namespace(){
     $fedora_namespace = drush_get_option('fedora_namespace');
@@ -654,11 +746,7 @@ function add_genre_to_MODS_for_namespace(){
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
- * @param type $manifest_file_path
- *  A path to a file containing a file path to a single asset on each line
- *
- * @param type $add_mods_flag
- *  Flag to ingest MODS datastream
+ * 
  */
 function update_DC_from_MODS_for_namespace() {
     $fedora_namespace = drush_get_option('fedora_namespace');
@@ -711,6 +799,50 @@ function update_DC_from_MODS_for_namespace() {
             }
         }
     }
+}
+
+/**
+ *
+ * @param type $fedora_namespace
+ *  The namespace in Fedora to relate as the collection parent for the
+ *  import
+ *
+ * 
+ */
+function update_DC_from_MODS_for_PIDS() {
+    
+    
+    $pids = drush_get_option('pids');
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+    $metadata_value = drush_get_option('metadata_value');
+    if (!isset($metadata_value)) {
+        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
+        return;
+    }
+
+    $pids_file = file($pids);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    foreach ($pids_file as $pid) {
+        $pid = trim($pid);
+        $object = islandora_object_load($pid);
+        if (!(isset($object['MODS']) && !empty($object['MODS']))) {
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+            } else {
+
+                $mods_txt = $object['MODS']->content;
+                ucla_migration_add_dc_to_object_from_mods($object, $mods_txt);
+            }
+    }
+    
+   
 }
 
 /**
