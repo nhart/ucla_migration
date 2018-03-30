@@ -124,7 +124,7 @@ function ucla_migration_drush_command() {
         'callback' => 'update_DC_from_MODS_for_PIDS',
         'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
         'arguments' => array(
-            'fedora_namespace' => array(
+            'pids' => array(
                 'description' => 'list of PIDS for which Mods metadata will be added to DC fields',
                 'required' => 'true'
             ),
@@ -834,12 +834,12 @@ function update_DC_from_MODS_for_PIDS() {
         $pid = trim($pid);
         $object = islandora_object_load($pid);
         if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
-            } else {
+           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+        } else {
 
-                $mods_txt = $object['MODS']->content;
-                ucla_migration_add_dc_to_object_from_mods($object, $mods_txt);
-            }
+            $mods_txt = $object['MODS']->content;
+            ucla_migration_add_dc_to_object_from_mods($object, $mods_txt);
+        }
     }
     
    
