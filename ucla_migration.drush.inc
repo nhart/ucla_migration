@@ -631,7 +631,7 @@ function update_Label_from_DC_for_namespace() {
 
 /**
  *
- * @param type $fedora_namespace
+ * @param type $pids
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
@@ -645,12 +645,7 @@ function update_Label_from_DC_for_PIDS() {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
     }
-    $metadata_value = drush_get_option('metadata_value');
-    if (!isset($metadata_value)) {
-        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
-        return;
-    }
-
+   
     $pids_file = file($pids);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
@@ -803,7 +798,7 @@ function update_DC_from_MODS_for_namespace() {
 
 /**
  *
- * @param type $fedora_namespace
+ * @param type $pids
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
@@ -817,11 +812,7 @@ function update_DC_from_MODS_for_PIDS() {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
     }
-    $metadata_value = drush_get_option('metadata_value');
-    if (!isset($metadata_value)) {
-        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
-        return;
-    }
+   
 
     $pids_file = file($pids);
     if (!$pids_file) {
