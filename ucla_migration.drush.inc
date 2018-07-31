@@ -308,6 +308,39 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+    
+    $items['ucla_share_objects'] = array(
+        'callback' => 'share_objects_between_collection',
+        'description' => 'This will ingest objects in more than 1 collection',
+        'options' => array(
+            'fedora_namespace' => array(
+                'description' => 'The Fedora namespace to update the datastreams under.',
+                'required' => 'true'
+            ),
+            'manifest_file_path' => array(
+                'description' => 'The path to the file containing a list of assets to ingest.',
+                'required' => 'true'
+            ),
+            'overwrite' => array(
+                'description' => 'If true, remove existing Fedora objects in the namespace with the same filename/title.',
+                'required' => 'true'
+            ),
+            'digitalObject' => array(
+                'description' => 'Provide one of following choices (MODS,TIFF,JPEG,PDF,VIDEO,TN)',
+                'required' => 'true'
+            ),
+            
+            'sharedCollection' => array(
+                'description' => 'comma separated collection pids'
+                'required' => 'true'
+            ),
+            
+        ),
+        'examples' => array(
+            'simple example' => 'drush -u 1 -l  ucla_share_objects fedoranamespace: manifest_file_path:/path/to/manifest/file.txt --digitalObject=TIFF --sharedCollection:cubanephemera,latinamericanandcaribbeanperiodicals',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
     $items['ucla_fix_page_sequence_number'] = array(
         'callback' => 'fix_page_sequence_number',
         'description' => 'Ingest content given digital assets but no metadata files.',
@@ -2468,6 +2501,77 @@ function minimum_metadata_ingest() {
         }
     }
 }
+
+
+/* for IDEP collections , we need to share objects with multiple collections*/
+function share_objects_between_collection() {
+
+    $fedora_namespace = drush_get_option('fedora_namespace');
+    $manifest_file_path = drush_get_option('manifest_file_path');
+    $overwrite = drush_get_option('overwrite');
+    $digitalObject = drush_get_option('digitalObject');
+    $sharedCollection = drush_get_option('sharedCollection') 
+
+    $manifest_file = file($manifest_file_path);
+    if (!$manifest_file) {
+        drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
+        return;
+    }
+
+    if (!isset($fedora_namespace)) {
+        drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+
+    if (!isset($overwrite)) {
+        drush_set_error('Overwrite flag not specified', '', 'Error: ');
+        return;
+    }
+    if (!isset($digitalObject)) {
+        drush_set_error('Please specify one of the following for digitalObject (IMAGE , PDF, VIDEO, MODS, TN)  not specified', '', 'Error: ');
+        return;
+    }
+    
+    if (!isset($sharedCollection)) {
+        drush_set_error('comma separated collection pids required', '', 'Error: ');
+        return;
+    }
+
+
+    $collection = islandora_object_load($fedora_namespace . ':1');
+    $collectionPids = explode(',',$sharedCollection);
+    foreach ($manifest_file as $file_path) {
+
+        $file_path = trim($file_path);
+
+        if (_is_valid_extension($file_path)) {
+
+            $file_path = _url_encode_http_address($file_path);
+
+            if (fopen($file_path, "r")) {
+
+                $file_name = basename($file_path);
+
+                $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
+                $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
+                foreach($collectionPids as $collectionPid){
+                    $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collectionPid . ':1');
+                }
+
+
+                _add_datastream_to_object($fedora_object, $file_path, $digitalObject);
+                $ingest_results = islandora_add_object($fedora_object);
+
+
+                watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
+            } else {
+                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+            }
+        }
+    }
+}
+
+
 
 
 function add_children_to_manuscript() {
