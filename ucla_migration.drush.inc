@@ -331,7 +331,7 @@ function ucla_migration_drush_command() {
             ),
             
             'sharedCollection' => array(
-                'description' => 'comma separated collection pids'
+                'description' => 'comma separated collection pids',
                 'required' => 'true'
             ),
             
@@ -538,7 +538,7 @@ function fix_fedoraObject_metadata_by_pids() {
         $object = islandora_object_load($pid);
         if (isset($object)) {
              if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -791,7 +791,7 @@ function update_DC_from_MODS_for_namespace() {
 
 
 
-    watchdog('UCLA Migration', "begin @results", array('@results' => $add_mods_flag), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin @results", array('@results' => $fedora_namespace), WATCHDOG_ERROR);
 
     // Get a connection to Fedora.
     $connection = islandora_get_tuque_connection();
@@ -858,7 +858,7 @@ function update_DC_from_MODS_for_PIDS() {
         $pid = trim($pid);
         $object = islandora_object_load($pid);
         if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
         } else {
 
             $mods_txt = $object['MODS']->content;
@@ -964,9 +964,9 @@ function ucla_migration_migrate_mets($file_path, $fedora_namespace, $recovery_nu
 
     // Final message to user.
     if ($results) {
-        drush_log("Successfully migrated {$collection->label} collection.", 'ok');
+        drush_log("Successfully migrated {$fedora_namespace} collection.", 'ok');
     } else {
-        drush_log("Failed to migrate {$collection->label} collection.  Check the watchdog logs for more info.", 'error');
+        drush_log("Failed to migrate {$fedora_namespace} collection.  Check the watchdog logs for more info.", 'error');
     }
 
     return;
@@ -1855,7 +1855,7 @@ function ucla_migration_get_value_from_datastream($pid, $datastream_id, $xpath_q
         }
 
         libxml_clear_errors();
-        return $xpath_results;
+        //return $xpath_results;
     }
 }
 
@@ -2510,7 +2510,7 @@ function share_objects_between_collection() {
     $manifest_file_path = drush_get_option('manifest_file_path');
     $overwrite = drush_get_option('overwrite');
     $digitalObject = drush_get_option('digitalObject');
-    $sharedCollection = drush_get_option('sharedCollection') 
+    $sharedCollection = drush_get_option('sharedCollection');
 
     $manifest_file = file($manifest_file_path);
     if (!$manifest_file) {
