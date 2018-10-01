@@ -72,6 +72,19 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+    $items['ucla_update_metadata_for_mods_by_pids'] = array(
+        'callback' => 'update_metadata_for_mods_by_pids',
+        'description' => 'fix all the objects in a given pids to add genre',
+        'arguments' => array(
+            'pids' => "The PIDS you're looking for.",
+            'metadata_value' => "Value of genre that needs to be added to mods",
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 ucla_update_metadata_for_mods_by_pids pids metadata_value',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
     $items['ucla_update_Label_from_DC_for_namespace'] = array(
         'callback' => 'update_Label_from_DC_for_namespace',
         'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
@@ -548,6 +561,42 @@ function fix_fedoraObject_metadata_by_pids() {
     }
 }
 
+
+function update_metadata_for_mods_by_pids() {
+    $pids = drush_get_option('pids');
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+    $metadata_value = drush_get_option('metadata_value');
+    if (!isset($metadata_value)) {
+        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
+        return;
+    }
+
+    $pids_file = file($pids);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    foreach ($pids_file as $pid) {
+
+
+        $pid = trim($pid);
+        $object = islandora_object_load($pid);
+        if (isset($object)) {
+            if (!(isset($object['MODS']) && !empty($object['MODS']))) {
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+            } else {
+
+                $mods_txt = $object['MODS']->content;
+                ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_value);
+            }
+        }
+    }
+}
 /**
  * Saves all pids in a Fedora namespace to a file.
  *
@@ -1645,6 +1694,44 @@ function ucla_migration_add_mods_to_object($object, $mods_txt) {
     $object->ingestDatastream($datastream);
 }
 
+
+function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_value){
+    try {
+        $xslt_proc = new XSLTProcessor();
+        if ($metadata_value == "Newspapers") {
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/update_metadata_value.xsl';
+            $xslt_proc->setParameter('','replace','newspapers');
+        }
+
+        $xslt_dom = new DOMDocument();
+        $xslt_dom->load($xslt_file);
+        $xslt_proc->importStyleSheet($xslt_dom);
+
+        // Prepare the mods DOM to transform.
+        $mods_dom = new DOMDocument();
+        $mods_dom->loadXML($mods_txt);
+
+        // Transform the MODS to DC.
+        $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
+        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_ERROR);
+        // Add  or update DC record to the object as a datastream.
+        if (isset($object['MODS'])) {
+            $datastream = $object['MODS'];
+        } else {
+            $datastream = $object->constructDatastream('MODS','M');
+            $datastream->label = "MODS Record";
+            $datastream->mimetype = "text/xml";
+        }
+
+        //$datastream->setContentFromString($mods_new_txt);
+        $datastream->content = $mods_new_txt;
+        $object->ingestDatastream($datastream);
+    } catch (Exception $e) {
+
+        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
+    }
+}
+
 function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
     try {
         $xslt_proc = new XSLTProcessor();
@@ -2444,7 +2531,7 @@ function mp4_ingest_with_mods() {
  *
  */
 function minimum_metadata_ingest() {
-
+    $time_start = microtime(true);
     $fedora_namespace = drush_get_option('fedora_namespace');
     $manifest_file_path = drush_get_option('manifest_file_path');
     $overwrite = drush_get_option('overwrite');
@@ -2496,10 +2583,16 @@ function minimum_metadata_ingest() {
 
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                file_put_contents('CreateObjectFailed'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
             }
         }
     }
+
+    $time_end = microtime(true);
+    $time = $time_end - $time_start;
+    watchdog('Ingest Time', 'Took @timecomplete seconds to finish the script', array('@timecomplete' => $time), WATCHDOG_ERROR);
+
 }
 
 
@@ -2997,7 +3090,7 @@ function delete_fedoraObject_by_nameSpace_searchQuery() {
 }
 
 function add_dataStream_to_digitalObject() {
-
+$time_start = microtime(true);
     $fedora_namespace = drush_get_option('fedora_namespace');
     $manifest_file_path = drush_get_option('manifest_file_path');
     $digitalObject = drush_get_option('digitalObject');
@@ -3094,10 +3187,14 @@ function add_dataStream_to_digitalObject() {
                 }
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_ERROR);
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                file_put_contents('DataStreamIngestFailed'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
             }
         }
     }
+    $time_end = microtime(true);
+    $time = $time_end - $time_start;
+    watchdog('Ingest Time', 'Took @timecomplete seconds to finish the script', array('@timecomplete' => $time), WATCHDOG_ERROR);
 }
 
 /**
