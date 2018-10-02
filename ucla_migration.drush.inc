@@ -22,6 +22,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
     $items['ucla_delete_fedoraObject_by_nameSpace'] = array(
         'callback' => 'delete_fedoraObject_by_nameSpace',
         'description' => 'delete all the objects in a given namespace',
@@ -34,6 +35,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
     $items['ucla_delete_fedoraObject_by_nameSpace_searchQuery'] = array(
         'callback' => 'delete_fedoraObject_by_nameSpace_searchQuery',
         'description' => 'delete all the objects in a given namespace and search query',
@@ -47,6 +49,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
     $items['ucla_fix_fedoraObject_relsExt_by_pids'] = array(
         'callback' => 'fix_fedoraObject_relsExt_by_pids',
         'description' => 'fix all the objects in a given pids to add mansucript content model',
@@ -59,6 +62,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
 	$items['ucla_fix_fedoraObject_metadata_by_pids'] = array(
         'callback' => 'fix_fedoraObject_metadata_by_pids',
         'description' => 'fix all the objects in a given pids to add genre',
@@ -72,9 +76,10 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
     $items['ucla_update_metadata_for_mods_by_pids'] = array(
         'callback' => 'update_metadata_for_mods_by_pids',
-        'description' => 'fix all the objects in a given pids to add genre',
+        'description' => 'fix all the objects in a given pids to update genre',
         'arguments' => array(
             'pids' => "The PIDS you're looking for.",
             'metadata_value' => "Value of genre that needs to be added to mods",
@@ -85,6 +90,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
     $items['ucla_update_Label_from_DC_for_namespace'] = array(
         'callback' => 'update_Label_from_DC_for_namespace',
         'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
@@ -164,6 +170,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
+
     $items['ucla_make_namespace_versionable'] = array(
         'callback' => 'ucla_migration_make_all_datastreams_versionable',
         'description' => "Sets all datastreams for all objects to versionable in the given namespace. Only run after executing ucla_save_pids_for_namespace and confirming that Fedora's resource index is turned off.",
@@ -511,7 +518,7 @@ function fix_fedoraObject_relsExt_by_pids() {
 
             $hasModelManuscriptCModel = FALSE;
             foreach ($object_content_models as $model) {
-                watchdog('UCLA Migration', "has Model Object @results", array('@results' => $model), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "has Model Object @results", array('@results' => $model), WATCHDOG_NOTICE);
                 if ($model['object']['value'] == 'islandora:manuscriptCModel') {
                     $hasModelManuscriptCModel = TRUE;
                     break;
@@ -551,7 +558,7 @@ function fix_fedoraObject_metadata_by_pids() {
         $object = islandora_object_load($pid);
         if (isset($object)) {
              if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_NOTICE);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -562,8 +569,8 @@ function fix_fedoraObject_metadata_by_pids() {
 }
 
 
-function update_metadata_for_mods_by_pids() {
-    $pids = drush_get_option('pids');
+function update_metadata_for_mods_by_pids($pids,$metadata_value) {
+   /* $pids = drush_get_option('pids');
     if (!isset($pids)) {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
@@ -572,7 +579,7 @@ function update_metadata_for_mods_by_pids() {
     if (!isset($metadata_value)) {
         drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
         return;
-    }
+    }*/
 
     $pids_file = file($pids);
     if (!$pids_file) {
@@ -588,7 +595,7 @@ function update_metadata_for_mods_by_pids() {
         $object = islandora_object_load($pid);
         if (isset($object)) {
             if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_NOTICE);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -687,12 +694,12 @@ function update_Label_from_DC_for_namespace() {
 
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_NOTICE);
 
     foreach ($results as $result) {
-        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
         if ($result['obj']['value'] !== $fedora_namespace . ':1') {
-            watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+            watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
             $object = islandora_object_load($result['obj']['value']);
             $dc_txt = $object['DC']->content;
             $dc_xml = simplexml_load_string($dc_txt);
@@ -701,10 +708,10 @@ function update_Label_from_DC_for_namespace() {
             $xml_namespaces = $dc_xml->getDocNamespaces();
             $dc_xml->registerXPathNamespace('oai_dc', $xml_namespaces['oai_dc']);
             $dc_xml->registerXPathNamespace('dc', $xml_namespaces['dc']);
-            watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_ERROR);
+            watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_NOTICE);
             $dc_query = "//dc:title[1]";
             $dc_array = $dc_xml->xpath($dc_query);
-            watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_ERROR);
+            watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_NOTICE);
 
             $object->label = $dc_array[0]->__toString();
         }
@@ -748,10 +755,10 @@ function update_Label_from_DC_for_PIDS() {
                 $xml_namespaces = $dc_xml->getDocNamespaces();
                 $dc_xml->registerXPathNamespace('oai_dc', $xml_namespaces['oai_dc']);
                 $dc_xml->registerXPathNamespace('dc', $xml_namespaces['dc']);
-                watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_NOTICE);
                 $dc_query = "//dc:title[1]";
                 $dc_array = $dc_xml->xpath($dc_query);
-                watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_NOTICE);
     
                 $object->label = $dc_array[0]->__toString();
 
@@ -798,16 +805,16 @@ function add_genre_to_MODS_for_namespace(){
 
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_NOTICE);
       foreach ($results as $result) {
-        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
         if ($result['obj']['value'] !== $fedora_namespace . ':1') {
-            watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+            watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
             $object = islandora_object_load($result['obj']['value']);
 
 
             if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -840,7 +847,7 @@ function update_DC_from_MODS_for_namespace() {
 
 
 
-    watchdog('UCLA Migration', "begin @results", array('@results' => $fedora_namespace), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin @results", array('@results' => $fedora_namespace), WATCHDOG_NOTICE);
 
     // Get a connection to Fedora.
     $connection = islandora_get_tuque_connection();
@@ -858,17 +865,17 @@ function update_DC_from_MODS_for_namespace() {
 
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_NOTICE);
 
     foreach ($results as $result) {
-        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
         if ($result['obj']['value'] !== $fedora_namespace . ':1') {
-            watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+            watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
             $object = islandora_object_load($result['obj']['value']);
 
 
             if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -907,7 +914,7 @@ function update_DC_from_MODS_for_PIDS() {
         $pid = trim($pid);
         $object = islandora_object_load($pid);
         if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_NOTICE);
         } else {
 
             $mods_txt = $object['MODS']->content;
@@ -1043,7 +1050,7 @@ function ucla_migration_start_new_migration($mets_xml, $fedora_namespace) {
 
     // Exit if ingest of collection object failed.
     if (!$collection) {
-        watchdog('UCLA Migration', 'Collection object ingest failed.', array(), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', 'Collection object ingest failed.', array(), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1079,7 +1086,7 @@ function ucla_migration_recover_migration($mets_xml, $fedora_namespace, $recover
 
     // Validate.
     if (is_null($last_good_object)) {
-        watchdog('UCLA Migration', 'Could not find last successfully ingested object with pid @pid', array('@pid' => $last_good_pid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', 'Could not find last successfully ingested object with pid @pid', array('@pid' => $last_good_pid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1088,12 +1095,12 @@ function ucla_migration_recover_migration($mets_xml, $fedora_namespace, $recover
 
     // Validate.
     if (empty($parents)) {
-        watchdog('UCLA Migration', 'Could not find parents of @pid, the last successfully ingested object.', array('@pid' => $last_good_pid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', 'Could not find parents of @pid, the last successfully ingested object.', array('@pid' => $last_good_pid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (count($parents) > 1) {
-        watchdog('UCLA Migration', 'Found more than one parent for @pid, the last successfully ingested object.', array('@pid' => $last_good_pid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', 'Found more than one parent for @pid, the last successfully ingested object.', array('@pid' => $last_good_pid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1211,17 +1218,17 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
     // Validate results.
     if (!is_array($collection_id_section_array)) {
-        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $collection_id_section_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $collection_id_section_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (empty($collection_id_section_array)) {
-        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $collection_id_section_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $collection_id_section_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (count($collection_id_section_array) > 1) {
-        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $collection_id_section_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $collection_id_section_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1234,17 +1241,17 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
     // Validate results.
     if (!is_array($collection_id_section_array)) {
-        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $collection_section_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $collection_section_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (empty($collection_id_section_array)) {
-        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $collection_section_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $collection_section_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (count($collection_id_section_array) > 1) {
-        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $collection_section_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $collection_section_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1255,12 +1262,12 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
     // Validate.
     if ($collection_section->count() == 0) {
-        watchdog('UCLA Migration', "Could not locate mdWrap element for @id in the METS.", array('@id' => $collection_id), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Could not locate mdWrap element for @id in the METS.", array('@id' => $collection_id), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if ($collection_section->count() > 1) {
-        watchdog('UCLA Migration', "Multiple mdWrap elements for @id in the METS.", array('@id' => $collection_id), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Multiple mdWrap elements for @id in the METS.", array('@id' => $collection_id), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1274,12 +1281,12 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
     // Validate.
     if ($collection_mods->count() == 0) {
-        watchdog('UCLA Migration', "Could not locate mods element for @id in the METS.", array('@id' => $collection_id), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Could not locate mods element for @id in the METS.", array('@id' => $collection_id), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if ($collection_mods->count() > 1) {
-        watchdog('UCLA Migration', "Multiple mods elements for @id in the METS.", array('@id' => $collection_id), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Multiple mods elements for @id in the METS.", array('@id' => $collection_id), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1300,7 +1307,7 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
     // Validate.
     if (!$ingest_results) {
-        watchdog('UCLA Migration', "Ingest for the collection object has failed.", array(), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Ingest for the collection object has failed.", array(), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1350,7 +1357,7 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
 
     // Exit if ingest of any child object failed.
     if (!$ingest_success) {
-        watchdog('UCLA Migration', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1425,7 +1432,7 @@ function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $co
 
     // Exit if ingest of any child object failed.
     if (!$ingest_success) {
-        watchdog('UCLA Migration', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1453,12 +1460,12 @@ function ucla_migration_get_all_children_xmls($mets_xml) {
 
     // Validate results.
     if (!is_array($image_array)) {
-        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $image_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $image_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (empty($image_array)) {
-        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $image_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $image_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1478,7 +1485,7 @@ function ucla_migration_get_all_children_xmls($mets_xml) {
 function ucla_migration_get_identifier_from_object_mods($object) {
     // Exit early if there's no MODS datastream.
     if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-        watchdog('UCLA Migration', "No MODS for object @pid", array('@pid' => $object->id), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No MODS for object @pid", array('@pid' => $object->id), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1496,17 +1503,17 @@ function ucla_migration_get_identifier_from_object_mods($object) {
 
     // Validate results.
     if (!is_array($id_array)) {
-        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $id_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $id_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (empty($id_array)) {
-        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $id_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $id_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (count($id_array) > 1) {
-        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $id_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $id_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1514,12 +1521,12 @@ function ucla_migration_get_identifier_from_object_mods($object) {
     $children = $id_array[0]->children($xml_namespaces['mods']);
 
     if ($children->count() == 0) {
-        watchdog('UCLA Migration', "The recordInfo div has no children.", array(), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "The recordInfo div has no children.", array(), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if ($children->count() > 1) {
-        watchdog('UCLA Migration', "The recordInfo div has too many children.", array(), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "The recordInfo div has too many children.", array(), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1558,12 +1565,12 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
 
     // Validate.
     if ($fptr_section->count() == 0) {
-        watchdog('UCLA Migration', "Could not locate fptr element for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Could not locate fptr element for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if ($fptr_section->count() > 1) {
-        watchdog('UCLA Migration', "Multiple fptr elements for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Multiple fptr elements for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1576,17 +1583,17 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
 
     // Validate.
     if (!is_array($file_path_array)) {
-        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $file_path_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $file_path_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (empty($file_path_array)) {
-        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $file_path_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $file_path_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (count($file_path_array) > 1) {
-        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $file_path_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $file_path_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1599,17 +1606,17 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
 
     // Validate.
     if (!is_array($mods_array)) {
-        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $mods_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Error in XPath query @query", array('@query' => $mods_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (empty($mods_array)) {
-        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $mods_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "No results for XPath query @query", array('@query' => $mods_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if (count($mods_array) > 1) {
-        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $mods_query), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "More than one result for XPath query @query", array('@query' => $mods_query), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1618,12 +1625,12 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
 
     // Validate.
     if ($mods_element->count() == 0) {
-        watchdog('UCLA Migration', "Could not locate mods element for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Could not locate mods element for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
     if ($mods_element->count() > 1) {
-        watchdog('UCLA Migration', "Multiple mods elements for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Multiple mods elements for @id in the METS.", array('@id' => (string) $dmdid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1643,7 +1650,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
 
     // Validate.
     if (!$ingest_results) {
-        watchdog('UCLA Migration', "Ingest for the child object @id has failed.", array('@id' => (string) $dmdid), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Ingest for the child object @id has failed.", array('@id' => (string) $dmdid), WATCHDOG_NOTICE);
         return FALSE;
     }
 
@@ -1713,7 +1720,7 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
 
         // Transform the MODS to DC.
         $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
-        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
         // Add  or update DC record to the object as a datastream.
         if (isset($object['MODS'])) {
             $datastream = $object['MODS'];
@@ -1728,7 +1735,7 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
         $object->ingestDatastream($datastream);
     } catch (Exception $e) {
 
-        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_NOTICE);
     }
 }
 
@@ -1753,7 +1760,7 @@ function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
 
         // Transform the MODS to DC.
         $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
-        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
         // Add  or update DC record to the object as a datastream.
         if (isset($object['MODS'])) {
             $datastream = $object['MODS'];
@@ -1768,7 +1775,7 @@ function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
         $object->ingestDatastream($datastream);
     } catch (Exception $e) {
 
-        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_NOTICE);
     }
 }
 
@@ -1796,7 +1803,7 @@ function ucla_migration_add_dc_to_object_from_mods($object, $mods_txt) {
 
         // Transform the MODS to DC.
         $dc_txt = $xslt_proc->transformToXML($mods_dom);
-        watchdog('UCLA Migration', "DC Record is : @results", array('@results' => $dc_txt), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "DC Record is : @results", array('@results' => $dc_txt), WATCHDOG_NOTICE);
         // Add  or update DC record to the object as a datastream.
         if (isset($object['DC'])) {
             $datastream = $object['DC'];
@@ -1811,7 +1818,7 @@ function ucla_migration_add_dc_to_object_from_mods($object, $mods_txt) {
         $object->ingestDatastream($datastream);
     } catch (Exception $e) {
 
-        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
+        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_NOTICE);
     }
 }
 
@@ -2396,7 +2403,7 @@ function images_ingest_with_mods() {
 
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
             }
         }
     }
@@ -2494,7 +2501,7 @@ function mp4_ingest_with_mods() {
 
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
             }
         }
     }
@@ -2583,7 +2590,7 @@ function minimum_metadata_ingest() {
 
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
             } else {
-                watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_NOTICE);
                 file_put_contents('CreateObjectFailed'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
             }
         }
@@ -2591,7 +2598,7 @@ function minimum_metadata_ingest() {
 
     $time_end = microtime(true);
     $time = $time_end - $time_start;
-    watchdog('Ingest Time', 'Took @timecomplete seconds to finish the script', array('@timecomplete' => $time), WATCHDOG_ERROR);
+    watchdog('Ingest Time', 'Took @timecomplete seconds to finish the script', array('@timecomplete' => $time), WATCHDOG_NOTICE);
 
 }
 
@@ -2658,7 +2665,7 @@ function share_objects_between_collection() {
 
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
             }
         }
     }
@@ -2693,11 +2700,11 @@ function add_children_to_manuscript() {
 
 
     // $collection = islandora_object_load($fedora_namespace . ':1');
-    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_NOTICE);
     $connection = islandora_get_tuque_connection();
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_NOTICE);
     $repo = $connection->repository;
-    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_NOTICE);
     foreach ($manifest_file as $file_path) {
 
         $file_path = trim($file_path);
@@ -2705,7 +2712,7 @@ function add_children_to_manuscript() {
         if (_is_valid_extension($file_path)) {
 
             $file_path = _url_encode_http_address($file_path);
-            watchdog('Ingest started ', 'file path @file_name', array('@file_name' => $file_path), WATCHDOG_ERROR);
+            watchdog('Ingest started ', 'file path @file_name', array('@file_name' => $file_path), WATCHDOG_NOTICE);
             if (fopen($file_path, "r")) {
 
                 $file_name = basename($file_path);
@@ -2714,7 +2721,7 @@ function add_children_to_manuscript() {
                 $searchString = $nameArray[0] . '_' . $nameArray[1] . "_MODS.xml";
                 $sequenceString = str_replace('.tif', '', $nameArray[2]);
                 $sequence = intval($sequenceString);
-                watchdog('Ingest started ', 'search string @file_name', array('@file_name' => $searchString), WATCHDOG_ERROR);
+                watchdog('Ingest started ', 'search string @file_name', array('@file_name' => $searchString), WATCHDOG_NOTICE);
 
                 // SPARQL query to parent object in a given namespace.
                 $query = "
@@ -2728,10 +2735,10 @@ function add_children_to_manuscript() {
     }
   ";
 
-                watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_NOTICE);
                 // Execute the query.
                 $results = $repo->ri->sparqlQuery($query);
-                watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_NOTICE);
                 $count = 0;
                 foreach ($results as $result) {
                     $count++;
@@ -2740,7 +2747,7 @@ function add_children_to_manuscript() {
 
                     $hasModelManuscriptCModel = FALSE;
                     foreach ($object_content_models as $model) {
-                        watchdog('UCLA Migration', "has Model Object @results", array('@results' => $model), WATCHDOG_ERROR);
+                        watchdog('UCLA Migration', "has Model Object @results", array('@results' => $model), WATCHDOG_NOTICE);
                         if ($model['object']['value'] == 'islandora:manuscriptCModel') {
                             $hasModelManuscriptCModel = TRUE;
                             break;
@@ -2758,16 +2765,16 @@ function add_children_to_manuscript() {
                     $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $sequence);
                     $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $sequence);
                     $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1');
-                    watchdog('UCLA Migration', "PID @results", array('@results' => $object->id), WATCHDOG_ERROR);
+                    watchdog('UCLA Migration', "PID @results", array('@results' => $object->id), WATCHDOG_NOTICE);
                     _add_datastream_to_object($fedora_object, $file_path, $digitalObject);
                     $ingest_results = islandora_add_object($fedora_object);
-                    watchdog('Ingest Success', 'Migrated object @file_name => @ingest', array('@file_name' => $file_name, '@ingest' => $ingest_results), WATCHDOG_ERROR);
+                    watchdog('Ingest Success', 'Migrated object @file_name => @ingest', array('@file_name' => $file_name, '@ingest' => $ingest_results), WATCHDOG_NOTICE);
                     if ($count == 1) {
                         break;
                     }
                 }
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
             }
         }
     }
@@ -2799,11 +2806,11 @@ function add_children_to_compound_object() {
 
 
     // $collection = islandora_object_load($fedora_namespace . ':1');
-    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_NOTICE);
     $connection = islandora_get_tuque_connection();
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_NOTICE);
     $repo = $connection->repository;
-    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_NOTICE);
     foreach ($manifest_file as $file_path) {
 
         $file_path = trim($file_path);
@@ -2811,7 +2818,7 @@ function add_children_to_compound_object() {
         if (_is_valid_extension($file_path)) {
 
             $file_path = _url_encode_http_address($file_path);
-            watchdog('Ingest started ', 'file path @file_name', array('@file_name' => $file_path), WATCHDOG_ERROR);
+            watchdog('Ingest started ', 'file path @file_name', array('@file_name' => $file_path), WATCHDOG_NOTICE);
             if (fopen($file_path, "r")) {
 
                 $file_name = basename($file_path);
@@ -2820,7 +2827,7 @@ function add_children_to_compound_object() {
                 $searchString = $nameArray[0] . '-' . "1.xml";
                 $sequenceString = str_replace('.tif', '', $nameArray[1]);
                 $sequence = intval($sequenceString);
-                watchdog('Ingest started ', 'search string @file_name', array('@file_name' => $searchString), WATCHDOG_ERROR);
+                watchdog('Ingest started ', 'search string @file_name', array('@file_name' => $searchString), WATCHDOG_NOTICE);
 
                 // SPARQL query to parent object in a given namespace.
                 $query = "
@@ -2834,10 +2841,10 @@ function add_children_to_compound_object() {
     }
   ";
 
-                watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_NOTICE);
                 // Execute the query.
                 $results = $repo->ri->sparqlQuery($query);
-                watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_NOTICE);
                 $count = 0;
                 foreach ($results as $result) {
                     $count++;
@@ -2846,7 +2853,7 @@ function add_children_to_compound_object() {
 
                     $hasModelManuscriptCModel = FALSE;
                     foreach ($object_content_models as $model) {
-                        watchdog('UCLA Migration', "has Model Object @results", array('@results' => $model), WATCHDOG_ERROR);
+                        watchdog('UCLA Migration', "has Model Object @results", array('@results' => $model), WATCHDOG_NOTICE);
                         if ($model['object']['value'] == 'islandora:compoundCModel') {
                             $hasModelManuscriptCModel = TRUE;
                             break;
@@ -2866,16 +2873,16 @@ function add_children_to_compound_object() {
                     $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, "isSequenceNumberOf$escape_pid", (string) $sequence, TRUE);
                     //$fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $sequence);
                     //$fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1');
-                    watchdog('UCLA Migration', "PID @results", array('@results' => $object->id), WATCHDOG_ERROR);
+                    watchdog('UCLA Migration', "PID @results", array('@results' => $object->id), WATCHDOG_NOTICE);
                     _add_datastream_to_object($fedora_object, $file_path, $digitalObject);
                     $ingest_results = islandora_add_object($fedora_object);
-                    watchdog('Ingest Success', 'Migrated object @file_name => @ingest', array('@file_name' => $file_name, '@ingest' => $ingest_results), WATCHDOG_ERROR);
+                    watchdog('Ingest Success', 'Migrated object @file_name => @ingest', array('@file_name' => $file_name, '@ingest' => $ingest_results), WATCHDOG_NOTICE);
                     if ($count == 1) {
                         break;
                     }
                 }
             } else {
-                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Child object ingest failed.', array(), WATCHDOG_NOTICE);
             }
         }
     }
@@ -2961,25 +2968,25 @@ function fix_page_sequence_number() {
 
 
     // $collection = islandora_object_load($fedora_namespace . ':1');
-    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_NOTICE);
     $connection = islandora_get_tuque_connection();
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_NOTICE);
     $repo = $connection->repository;
-    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_NOTICE);
     foreach ($manifest_file as $file_path) {
 
         $file_path = trim($file_path);
         if (_is_valid_extension($file_path)) {
 
             $file_path = _url_encode_http_address($file_path);
-            watchdog('Ingest started ', 'file path @file_name', array('@file_name' => $file_path), WATCHDOG_ERROR);
+            watchdog('Ingest started ', 'file path @file_name', array('@file_name' => $file_path), WATCHDOG_NOTICE);
             if (fopen($file_path, "r")) {
 
                 $file_name = basename($file_path);
                 $nameArray = explode("_", $file_name);
                 $sequenceString = str_replace('.tif', '', $nameArray[2]);
                 $sequence = intval($sequenceString);
-                watchdog('Ingest started ', 'search string @file_name', array('@file_name' => $file_name), WATCHDOG_ERROR);
+                watchdog('Ingest started ', 'search string @file_name', array('@file_name' => $file_name), WATCHDOG_NOTICE);
 
                 // SPARQL query to parent object in a given namespace.
                 $query = "
@@ -2993,10 +3000,10 @@ function fix_page_sequence_number() {
     }
   ";
 
-                watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_NOTICE);
                 // Execute the query.
                 $results = $repo->ri->sparqlQuery($query);
-                watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_ERROR);
+                watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_NOTICE);
                 foreach ($results as $result) {
                     $object = islandora_object_load($result['obj']['value']);
                     $object->relationships->remove(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber');
@@ -3017,9 +3024,9 @@ function delete_fedoraObject_by_nameSpace() {
     }
     // Get a connection to Fedora.
     $connection = islandora_get_tuque_connection();
-    watchdog('Delete step 1 connection object', ' @file_name', array('@file_name' => $connection), WATCHDOG_ERROR);
+    watchdog('Delete step 1 connection object', ' @file_name', array('@file_name' => $connection), WATCHDOG_NOTICE);
     $repo = $connection->repository;
-    watchdog('Delete step 2 connection object', ' @file_name', array('@file_name' => $repo), WATCHDOG_ERROR);
+    watchdog('Delete step 2 connection object', ' @file_name', array('@file_name' => $repo), WATCHDOG_NOTICE);
 
     // SPARQL query to get all objects in a given namespace.
     $query = "
@@ -3030,14 +3037,14 @@ function delete_fedoraObject_by_nameSpace() {
       FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:'))
     }
   ";
-    watchdog('Delete step 3 connection object', ' @file_name', array('@file_name' => $query), WATCHDOG_ERROR);
+    watchdog('Delete step 3 connection object', ' @file_name', array('@file_name' => $query), WATCHDOG_NOTICE);
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
 
-    watchdog('Delete step 4 connection object', ' @file_name', array('@file_name' => var_dump($results)), WATCHDOG_ERROR);
+    watchdog('Delete step 4 connection object', ' @file_name', array('@file_name' => var_dump($results)), WATCHDOG_NOTICE);
     $pids = array();
     foreach ($results as $result) {
-        watchdog('Delete step 4 in foreach', ' @file_name', array('@file_name' => var_dump($result)), WATCHDOG_ERROR);
+        watchdog('Delete step 4 in foreach', ' @file_name', array('@file_name' => var_dump($result)), WATCHDOG_NOTICE);
         if ($result['obj']['value'] !== $fedora_namespace . ':1') {
             array_push($pids, $result['obj']['value']);
         }
@@ -3059,9 +3066,9 @@ function delete_fedoraObject_by_nameSpace_searchQuery() {
     }
     // Get a connection to Fedora.
     $connection = islandora_get_tuque_connection();
-    watchdog('Delete step 1 connection object', ' @file_name', array('@file_name' => $connection), WATCHDOG_ERROR);
+    watchdog('Delete step 1 connection object', ' @file_name', array('@file_name' => $connection), WATCHDOG_NOTICE);
     $repo = $connection->repository;
-    watchdog('Delete step 2 connection object', ' @file_name', array('@file_name' => $repo), WATCHDOG_ERROR);
+    watchdog('Delete step 2 connection object', ' @file_name', array('@file_name' => $repo), WATCHDOG_NOTICE);
 
     // SPARQL query to get all objects in a given namespace.
     $query = "
@@ -3074,14 +3081,14 @@ function delete_fedoraObject_by_nameSpace_searchQuery() {
      FILTER(regex(str(?label), '$label_search'))    
     }
   ";
-    watchdog('Delete step 3 connection object', ' @file_name', array('@file_name' => $query), WATCHDOG_ERROR);
+    watchdog('Delete step 3 connection object', ' @file_name', array('@file_name' => $query), WATCHDOG_NOTICE);
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
 
-    watchdog('Delete step 4 connection object', ' @file_name', array('@file_name' => var_dump($results)), WATCHDOG_ERROR);
+    watchdog('Delete step 4 connection object', ' @file_name', array('@file_name' => var_dump($results)), WATCHDOG_NOTICE);
     $pids = array();
     foreach ($results as $result) {
-        watchdog('Delete step 4 in foreach', ' @file_name', array('@file_name' => var_dump($result)), WATCHDOG_ERROR);
+        watchdog('Delete step 4 in foreach', ' @file_name', array('@file_name' => var_dump($result)), WATCHDOG_NOTICE);
         if ($result['obj']['value'] !== $fedora_namespace . ':1') {
             array_push($pids, $result['obj']['value']);
         }
@@ -3116,11 +3123,11 @@ $time_start = microtime(true);
 
 
 
-    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 1 @results", array('@results' => $fedora_namespace), WATCHDOG_NOTICE);
     $connection = islandora_get_tuque_connection();
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $connection), WATCHDOG_NOTICE);
     $repo = $connection->repository;
-    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 3 @results", array('@results' => $repo), WATCHDOG_NOTICE);
 // SPARQL query to get all objects in a given namespace.
     $query = "
     SELECT ?obj ?label
@@ -3132,18 +3139,18 @@ $time_start = microtime(true);
     }
   ";
 
-    watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_NOTICE);
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
     
-    watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_ERROR);
+    watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_NOTICE);
    
     foreach ($manifest_file as $file_path) {
 
         $file_path = trim($file_path);
 
         if (_is_valid_extension($file_path)) {
-            watchdog('Reading manifest file', ' object @$file_path', array('@file_path' => $file_path), WATCHDOG_ERROR);
+            watchdog('Reading manifest file', ' object @$file_path', array('@file_path' => $file_path), WATCHDOG_NOTICE);
             $file_path = _url_encode_http_address($file_path);
 
             if (fopen($file_path, "r")) {
@@ -3159,7 +3166,7 @@ $time_start = microtime(true);
                 $file_name = str_replace(".png", "", $file_name);  
                 $file_name = str_replace(".jpg", "", $file_name); 
 //                $file_name = str_replace("_a", "", $file_name);
-                watchdog('Ingest Success filename', ' object @file_name', array('@file_name' => $file_name), WATCHDOG_ERROR);
+                watchdog('Ingest Success filename', ' object @file_name', array('@file_name' => $file_name), WATCHDOG_NOTICE);
                
                 foreach ($results as $result) {
                     $label = $result['label']['value'];
@@ -3178,23 +3185,23 @@ $time_start = microtime(true);
 //                    $label = str_replace("_a", "", $label);
                     
                     if ($file_name == $label) {
-                        watchdog('Ingest Success started', ' object @file_name', array('@file_name' => $file_nameRaw), WATCHDOG_ERROR);
+                        watchdog('Ingest Success started', ' object @file_name', array('@file_name' => $file_nameRaw), WATCHDOG_NOTICE);
                         $object = islandora_object_load($result['obj']['value']);
                         // $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
                         _add_datastream_to_object($object, $file_path, $digitalObject);
 			break;
                     }
                 }
-                watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_ERROR);
+                watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_NOTICE);
             } else {
-                watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_NOTICE);
                 file_put_contents('DataStreamIngestFailed'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
             }
         }
     }
     $time_end = microtime(true);
     $time = $time_end - $time_start;
-    watchdog('Ingest Time', 'Took @timecomplete seconds to finish the script', array('@timecomplete' => $time), WATCHDOG_ERROR);
+    watchdog('Ingest Time', 'Took @timecomplete seconds to finish the script', array('@timecomplete' => $time), WATCHDOG_NOTICE);
 }
 
 /**
@@ -3356,7 +3363,7 @@ function _add_images_to_object($object, $tiff_path, $jpeg_path) {
     if (fopen($tiff_path, 'r')) {
         $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
         $datastream = $object->constructDatastream('OBJ', 'M');
-        watchdog('Ingest Success', 'The file is tif @file_name', array('@file_name' => $tiff_path), WATCHDOG_ERROR);
+        watchdog('Ingest Success', 'The file is tif @file_name', array('@file_name' => $tiff_path), WATCHDOG_NOTICE);
         $datastream->label = "High Quality Tiff";
         $datastream->mimetype = "image/tiff";
         $datastream->setContentFromFile($tiff_path);
@@ -3365,7 +3372,7 @@ function _add_images_to_object($object, $tiff_path, $jpeg_path) {
         if (fopen($jpeg_path, 'r')) {
             $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
             $datastream = $object->constructDatastream('OBJ', 'M');
-            watchdog('Ingest Success', 'The file is jpeg @file_name', array('@file_name' => $jpeg_path), WATCHDOG_ERROR);
+            watchdog('Ingest Success', 'The file is jpeg @file_name', array('@file_name' => $jpeg_path), WATCHDOG_NOTICE);
             $datastream->label = "High Quality JPEG";
             $datastream->mimetype = "image/jpeg";
             $datastream->setContentFromFile($jpeg_path);
@@ -3494,7 +3501,7 @@ function _add_pdf_to_object($object, $pdf_path) {
  */
 function _add_teixml_to_object($object, $tei_path) {
     // get mods datastream from object if exist or else create a new one add this logic
-    watchdog('Ingest Success', 'In add teixml @file_name', array('@file_name' => $tei_path), WATCHDOG_ERROR);
+    watchdog('Ingest Success', 'In add teixml @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
     $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:manuscriptCModel');
     if (isset($object['TEI'])) {
         $datastream = $object['TEI'];
@@ -3503,13 +3510,13 @@ function _add_teixml_to_object($object, $tei_path) {
         $datastream->label = "TEI Record";
         $datastream->mimetype = "text/xml";
     }
-    watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $tei_path), WATCHDOG_ERROR);
+    watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
     //$datastream->setContentFromFile($mods_path);
     $tei_file = file_get_contents($tei_path);
     $datastream->content = $tei_file;
     $object->ingestDatastream($datastream);
 
-    watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $tei_file), WATCHDOG_ERROR);
+    watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $tei_file), WATCHDOG_NOTICE);
 }
 
 /**
@@ -3523,7 +3530,7 @@ function _add_teixml_to_object($object, $tei_path) {
  */
 function _add_modsxml_to_object($object, $mods_path) {
     // get mods datastream from object if exist or else create a new one add this logic
-    watchdog('Ingest Success', 'In add modsxml @file_name', array('@file_name' => $mods_path), WATCHDOG_ERROR);
+    watchdog('Ingest Success', 'In add modsxml @file_name', array('@file_name' => $mods_path), WATCHDOG_NOTICE);
     if (isset($object['MODS'])) {
         $datastream = $object['MODS'];
     } else {
@@ -3531,13 +3538,13 @@ function _add_modsxml_to_object($object, $mods_path) {
         $datastream->label = "MODS Record";
         $datastream->mimetype = "text/xml";
     }
-    watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $mods_path), WATCHDOG_ERROR);
+    watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $mods_path), WATCHDOG_NOTICE);
     //$datastream->setContentFromFile($mods_path);
     $mods_file = file_get_contents($mods_path);
     $datastream->content = $mods_file;
     $object->ingestDatastream($datastream);
 
-    watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $mods_file), WATCHDOG_ERROR);
+    watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $mods_file), WATCHDOG_NOTICE);
 }
 
 /**
