@@ -511,8 +511,8 @@ function fix_fedoraObject_relsExt_by_pids() {
     foreach ($pids_file as $pid) {
 
 
-        $pid = trim($pid);
-        $object = islandora_object_load($pid);
+        //$pid = trim($pid);
+        $object = islandora_object_load(trim($pid));
         if (isset($object)) {
             $object_content_models = $object->relationships->get('info:fedora/fedora-system:def/model#', 'hasModel');
 
@@ -554,11 +554,11 @@ function fix_fedoraObject_metadata_by_pids() {
     foreach ($pids_file as $pid) {
 
 
-        $pid = trim($pid);
-        $object = islandora_object_load($pid);
+        //$pid = trim($pid);
+        $object = islandora_object_load(trim($pid));
         if (isset($object)) {
-             if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+             if (!(isset($object['MODS']) && empty($object['MODS']))) {
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -591,11 +591,11 @@ function update_metadata_for_mods_by_pids($pids,$metadata_value) {
     foreach ($pids_file as $pid) {
 
 
-        $pid = trim($pid);
-        $object = islandora_object_load($pid);
+        //$pid = trim($pid);
+        $object = islandora_object_load(trim($pid));
         if (isset($object)) {
-            if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+            if (!(isset($object['MODS']) && empty($object['MODS']))) {
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -743,8 +743,8 @@ function update_Label_from_DC_for_PIDS() {
 
 
     foreach ($pids_file as $pid) {
-        $pid = trim($pid);
-        $object = islandora_object_load($pid);
+        //$pid = trim($pid);
+        $object = islandora_object_load(trim($pid));
         if (isset($object)) {
             
                 
@@ -813,7 +813,7 @@ function add_genre_to_MODS_for_namespace(){
             $object = islandora_object_load($result['obj']['value']);
 
 
-            if (!(isset($object['MODS']) && !empty($object['MODS']))) {
+            if (!(isset($object['MODS']) && empty($object['MODS']))) {
                 watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
             } else {
 
@@ -874,7 +874,7 @@ function update_DC_from_MODS_for_namespace() {
             $object = islandora_object_load($result['obj']['value']);
 
 
-            if (!(isset($object['MODS']) && !empty($object['MODS']))) {
+            if (!(isset($object['MODS']) && empty($object['MODS']))) {
                 watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
             } else {
 
@@ -911,10 +911,10 @@ function update_DC_from_MODS_for_PIDS() {
 
 
     foreach ($pids_file as $pid) {
-        $pid = trim($pid);
-        $object = islandora_object_load($pid);
-        if (!(isset($object['MODS']) && !empty($object['MODS']))) {
-           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object['obj']['value']), WATCHDOG_ERROR);
+        //$pid = trim($pid);
+        $object = islandora_object_load(trim($pid));
+        if (!(isset($object['MODS']) && empty($object['MODS']))) {
+           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
         } else {
 
             $mods_txt = $object['MODS']->content;
@@ -1484,7 +1484,7 @@ function ucla_migration_get_all_children_xmls($mets_xml) {
  */
 function ucla_migration_get_identifier_from_object_mods($object) {
     // Exit early if there's no MODS datastream.
-    if (!(isset($object['MODS']) && !empty($object['MODS']))) {
+    if (!(isset($object['MODS']) && empty($object['MODS']))) {
         watchdog('UCLA Migration', "No MODS for object @pid", array('@pid' => $object->id), WATCHDOG_ERROR);
         return FALSE;
     }
@@ -1721,17 +1721,17 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
         // Transform the MODS to DC.
         $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
         watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
-        // Add  or update DC record to the object as a datastream.
-        if (isset($object['MODS'])) {
+        //  update MODS record to the object as a datastream.
+       /* if (isset($object['MODS'])) {
             $datastream = $object['MODS'];
         } else {
             $datastream = $object->constructDatastream('MODS','M');
             $datastream->label = "MODS Record";
             $datastream->mimetype = "text/xml";
-        }
-
-        //$datastream->setContentFromString($mods_new_txt);
-        $datastream->content = $mods_new_txt;
+        }*/
+        $datastream = $object['MODS'];
+        //$datastream->setContentFromString($mods_new_txt); This function did not update mods string
+        $datastream->content = $mods_new_txt; // hence I used this attribute
         $object->ingestDatastream($datastream);
     } catch (Exception $e) {
 
