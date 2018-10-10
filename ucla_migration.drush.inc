@@ -1708,6 +1708,8 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
         if ($metadata_value == "Newspapers") {
             $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/update_metadata_value.xsl';
             $xslt_proc->setParameter('','replace','newspapers');
+        }else{
+            watchdog('UCLA Migration', "metadata text is invalid", WATCHDOG_ERROR);
         }
 
         $xslt_dom = new DOMDocument();
