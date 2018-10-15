@@ -3031,8 +3031,8 @@ function fix_page_sequence_number() {
     }
 }
 
-function delete_fedoraObject_by_nameSpace() {
-    $fedora_namespace = drush_get_option('fedora_namespace');
+function delete_fedoraObject_by_nameSpace($fedora_namespace) {
+    //$fedora_namespace = drush_get_option('fedora_namespace');
     if (!isset($fedora_namespace)) {
         drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
         return;
