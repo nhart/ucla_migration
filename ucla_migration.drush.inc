@@ -36,6 +36,19 @@ function ucla_migration_drush_command() {
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
 
+    $items['ucla_delete_fedoraObject_by_pids'] = array(
+        'callback' => 'delete_fedoraObject_by_pids',
+        'description' => 'delete all the objects in a given namespace',
+        'arguments' => array(
+            'pids' => " PIDS to delete",
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 -l http://example.com ucla_delete_fedoraObject_by_pids pidsfilepath',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
+
     $items['ucla_delete_fedoraObject_by_nameSpace_searchQuery'] = array(
         'callback' => 'delete_fedoraObject_by_nameSpace_searchQuery',
         'description' => 'delete all the objects in a given namespace and search query',
@@ -3054,9 +3067,27 @@ function delete_fedoraObject_by_nameSpace() {
     _purge_object_by_pid($pids);
 }
 
-function delete_fedoraObject_by_nameSpace_searchQuery() {
-    $fedora_namespace = drush_get_option('fedora_namespace');
-    $label_search  = drush_get_option('label_search');
+function delete_fedoraObject_by_pids($pids) {
+
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+
+
+    $pids_file = file($pids);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    _purge_object_by_pid($pids_file);
+}
+
+function delete_fedoraObject_by_nameSpace_searchQuery($fedora_namespace,$label_search) {
+    //$fedora_namespace = drush_get_option('fedora_namespace');
+    //$label_search  = drush_get_option('label_search');
     if (!isset($fedora_namespace)) {
         drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
         return;
@@ -3099,7 +3130,7 @@ function delete_fedoraObject_by_nameSpace_searchQuery() {
 }
 
 function add_dataStream_to_digitalObject() {
-$time_start = microtime(true);
+    $time_start = microtime(true);
     $fedora_namespace = drush_get_option('fedora_namespace');
     $manifest_file_path = drush_get_option('manifest_file_path');
     $digitalObject = drush_get_option('digitalObject');
@@ -3557,10 +3588,10 @@ function _add_modsxml_to_object($object, $mods_path) {
  *
  */
 function _purge_object_by_pid($pids) {
-
+    watchdog('In Purged function', WATCHDOG_NOTICE);
     foreach ($pids as $pid) {
         $fedora_obj = islandora_object_load($pid);
-
+        watchdog('Object to be purged', 'object @file_name', array('@file_name' => $fedora_obj), WATCHDOG_NOTICE);
         if ($fedora_obj) {
             if (islandora_delete_object($fedora_obj)) {
                 drush_log("Successfully purged pid {$pid} ", 'ok');
@@ -3569,6 +3600,7 @@ function _purge_object_by_pid($pids) {
             }
         }
     }
+    watchdog('out Purged function', WATCHDOG_NOTICE);
 }
 
 /**
