@@ -3064,7 +3064,10 @@ function delete_fedoraObject_by_nameSpace($fedora_namespace) {
             array_push($pids, $result['obj']['value']);
         }
     }
-    _purge_object_by_pid($pids);
+    if($pids){
+        _purge_object_by_pid($pids);
+    }
+
 }
 
 function delete_fedoraObject_by_pids($pids) {
@@ -3590,8 +3593,9 @@ function _add_modsxml_to_object($object, $mods_path) {
 function _purge_object_by_pid($pids) {
     watchdog('In Purged function', WATCHDOG_NOTICE);
     foreach ($pids as $pid) {
-        $fedora_obj = islandora_object_load($pid);
-        watchdog('Object to be purged', 'object @file_name', array('@file_name' => $fedora_obj), WATCHDOG_NOTICE);
+        watchdog('Object to be purged', 'pid @file_name', array('@file_name' => $pid), WATCHDOG_NOTICE);
+        $fedora_obj = islandora_object_load(trim($pid));
+        watchdog('Object to be purged', 'object @file_name', array('@file_name' => var_dump($fedora_obj)), WATCHDOG_NOTICE);
         if ($fedora_obj) {
             if (islandora_delete_object($fedora_obj)) {
                 drush_log("Successfully purged pid {$pid} ", 'ok');
