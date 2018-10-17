@@ -3078,12 +3078,11 @@ function delete_fedoraObject_by_pids($pids) {
     }
 
 
-    $pids_file = file($pids);
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
         return;
     }
-
 
     _purge_object_by_pid($pids_file);
 }
