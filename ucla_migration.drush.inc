@@ -514,7 +514,7 @@ function fix_fedoraObject_relsExt_by_pids() {
 
 
 
-    $pids_file = file($pids);
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file file $pids", "Error: ");
         return;
@@ -557,7 +557,7 @@ function fix_fedoraObject_metadata_by_pids() {
         return;
     }
 
-    $pids_file = file($pids);
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
         return;
@@ -594,7 +594,7 @@ function update_metadata_for_mods_by_pids($pids,$metadata_value) {
         return;
     }
 
-    $pids_file = file($pids);
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
         return;
@@ -748,7 +748,7 @@ function update_Label_from_DC_for_PIDS() {
         return;
     }
    
-    $pids_file = file($pids);
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
         return;
@@ -916,7 +916,7 @@ function update_DC_from_MODS_for_PIDS() {
     }
    
 
-    $pids_file = file($pids);
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
         return;
@@ -2175,7 +2175,7 @@ function ucla_migration_attach_datastream($datastream_path, $datastream_id, $mim
 
 
     // Attempt to grab the file containing list of content locations
-    $datastream_asset_file = file($datastream_path);
+    $datastream_asset_file = file($datastream_path, FILE_IGNORE_NEW_LINES);
 
     if (!$datastream_asset_file) {
         drush_set_error('File not found', "Could not locate mets file $datastream_path", "Error: ");
@@ -2365,7 +2365,7 @@ function images_ingest_with_mods() {
     $overwrite = drush_get_option('overwrite');
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -2463,7 +2463,7 @@ function mp4_ingest_with_mods() {
     $overwrite = drush_get_option('overwrite');
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -2560,7 +2560,7 @@ function minimum_metadata_ingest() {
     $digitalObject = drush_get_option('digitalObject');
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -2627,7 +2627,7 @@ function share_objects_between_collection() {
     $digitalObject = drush_get_option('digitalObject');
     $sharedCollection = drush_get_option('sharedCollection');
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -2696,7 +2696,7 @@ function add_children_to_manuscript() {
     $digitalObject = drush_get_option('digitalObject');
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -2802,7 +2802,7 @@ function add_children_to_compound_object() {
     $digitalObject = drush_get_option('digitalObject');
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -2967,7 +2967,7 @@ function fix_page_sequence_number() {
 
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -3145,7 +3145,7 @@ function add_dataStream_to_digitalObject() {
     }
 
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
@@ -3661,7 +3661,7 @@ function add_items_to_collection() {
     $fedora_dest_collection = drush_get_option('fedora_dest_collection');
     $manifest_file_path = drush_get_option('manifest_file_path');
 
-    $manifest_file = file($manifest_file_path);
+    $manifest_file = file($manifest_file_path, FILE_IGNORE_NEW_LINES);
     if (!$manifest_file) {
         drush_set_error('File not found', "Could not locate manifest file file $manifest_file_path", "Error: ");
         return;
