@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<mods:mods xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:mods="http://www.loc.gov/mods/v3"
+    xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-4.xsd">
+    <mods:identifier type="local" displayLabel="File name"
+        >bncjm_elfigaro_18851203.pdf</mods:identifier>
+    <mods:relatedItem type="host">
+        <mods:titleInfo>
+            <mods:title>Cuban Ephemera</mods:title>
+        </mods:titleInfo>
+    </mods:relatedItem>
+    <mods:relatedItem type="host">
+        <mods:titleInfo>
+            <mods:title>Latin American and Caribbean periodicals</mods:title>
+        </mods:titleInfo>
+    </mods:relatedItem>
+    <mods:typeOfResource>text</mods:typeOfResource>
+    <mods:genre>Newspapers</mods:genre>
+    <mods:language>
+        <mods:languageTerm type="text">Spanish</mods:languageTerm>
+        <mods:languageTerm type="code">spa</mods:languageTerm>
+    </mods:language>
+    <mods:subject>
+        <mods:topic>Cuban literature--Periodicals</mods:topic>
+        <mods:topic>Cuba--Intellectual life--Periodicals</mods:topic>
+        <mods:topic>Sports--Cuba--Periodicals</mods:topic>
+    </mods:subject>
+    <mods:titleInfo>
+        <mods:title>El Figaro: semanario de literatura y sports, vol. 1, no. 20</mods:title>
+    </mods:titleInfo>
+    <mods:physicalDescription>
+        <mods:extent>8 pp. ; 20,5 x 30 cm</mods:extent>
+    </mods:physicalDescription>
+    <mods:accessCondition>
+        <copyrightMD:copyright
+            xsi:schemaLocation="http://www.cdlib.org/inside/diglib/copyrightMD http://www.cdlib.org/groups/rmg/docs/copyrightMD.xsd"
+            type="use and reproduction"  xmlns:copyrightMD="http://www.cdlib.org/inside/diglib/copyrightMD"
+            copyright.status="No Copyright - Contractual Restrictions"
+            publication.status="published">
+            <copyrightMD:services>
+                <copyrightMD:contact>http://www.bnjm.cu, portal@bnjm.cu</copyrightMD:contact>
+            </copyrightMD:services>
+        </copyrightMD:copyright>
+    </mods:accessCondition>
+    <mods:part>
+        <mods:detail type="volume">
+            <mods:number type="vol. 1"/>
+        </mods:detail>
+        <mods:detail type="issue">
+            <mods:number type="no. 20"/>
+        </mods:detail>
+    </mods:part>
+    <mods:originInfo>
+        <mods:dateIssued encoding="iso8601">1885-12-03</mods:dateIssued>
+        <mods:publisher>Impr. El Figaro</mods:publisher>
+        <mods:place>Havana</mods:place>
+    </mods:originInfo>
+    <mods:location>
+        <mods:physicalLocation>Biblioteca Nacional de Cuba José Martí</mods:physicalLocation>
+    </mods:location>
+</mods:mods>

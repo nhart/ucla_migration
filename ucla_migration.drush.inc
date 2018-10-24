@@ -104,6 +104,20 @@ function ucla_migration_drush_command() {
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
 
+    $items['ucla_delete_mods_element_by_pids'] = array(
+        'callback' => 'delete_mods_element_by_pids',
+        'description' => 'delete mods element by local_name for the  given pids',
+        'arguments' => array(
+            'pids' => "The PIDS you're looking for.",
+            'local_name' => "mods element local name(without the namespace)",
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 ucla_delete_mods_element_by_pids pids local_name',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
+
     $items['ucla_update_Label_from_DC_for_namespace'] = array(
         'callback' => 'update_Label_from_DC_for_namespace',
         'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
@@ -617,6 +631,42 @@ function update_metadata_for_mods_by_pids($pids,$metadata_value) {
         }
     }
 }
+
+function delete_mods_element_by_pids($pids,$local_name) {
+    // $pids = drush_get_option('pids');
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+    //$metadata_value = drush_get_option('metadata_value');
+    if (!isset($local_name)) {
+        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
+        return;
+    }
+
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    foreach ($pids_file as $pid) {
+
+
+        //$pid = trim($pid);
+        $object = islandora_object_load(trim($pid));
+        if (isset($object)) {
+            if (!isset($object['MODS']) || empty($object['MODS'])) {
+                watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
+            } else {
+
+                $mods_txt = $object['MODS']->content;
+                ucla_migration_delete_element_from_mods($object, $mods_txt, $local_name);
+            }
+        }
+    }
+}
 /**
  * Saves all pids in a Fedora namespace to a file.
  *
@@ -845,8 +895,8 @@ function add_genre_to_MODS_for_namespace(){
  *
  * 
  */
-function update_DC_from_MODS_for_namespace() {
-    $fedora_namespace = drush_get_option('fedora_namespace');
+function update_DC_from_MODS_for_namespace($fedora_namespace) {
+    //$fedora_namespace = drush_get_option('fedora_namespace');
 
 
 
@@ -889,6 +939,7 @@ function update_DC_from_MODS_for_namespace() {
 
             if (!isset($object['MODS']) || empty($object['MODS'])) {
                 watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $result['obj']['value']), WATCHDOG_ERROR);
+                file_put_contents('NoModsObjects'.date("Y-m-d").'.txt',$result['obj']['value'], FILE_APPEND);
             } else {
 
                 $mods_txt = $object['MODS']->content;
@@ -1721,7 +1772,7 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
         if ($metadata_value == "Newspapers") {
             $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/update_metadata_value.xsl';
             $xslt_proc->setParameter('','replace','newspapers');
-        }else{
+        } else {
             watchdog('UCLA Migration', "metadata text is invalid", WATCHDOG_ERROR);
         }
 
@@ -1744,6 +1795,48 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
             $datastream->label = "MODS Record";
             $datastream->mimetype = "text/xml";
         }*/
+        $datastream = $object['MODS'];
+        //$datastream->setContentFromString($mods_new_txt); This function did not update mods string
+        $datastream->content = $mods_new_txt; // hence I used this attribute
+        //$object->ingestDatastream($datastream);
+    } catch (Exception $e) {
+
+        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
+    }
+}
+
+function ucla_migration_delete_element_from_mods($object, $mods_txt, $element){
+    try {
+        $xslt_proc = new XSLTProcessor();
+
+
+       if($element){
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/delete_element.xsl';
+           $xslt_proc->setParameter('','removeElementsNamed',$element);
+        } else {
+            watchdog('UCLA Migration', "element is invalid", WATCHDOG_ERROR);
+           return;
+        }
+
+        $xslt_dom = new DOMDocument();
+        $xslt_dom->load($xslt_file);
+        $xslt_proc->importStyleSheet($xslt_dom);
+
+        // Prepare the mods DOM to transform.
+        $mods_dom = new DOMDocument();
+        $mods_dom->loadXML($mods_txt);
+
+        // Transform the MODS to DC.
+        $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
+        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
+        //  update MODS record to the object as a datastream.
+        /* if (isset($object['MODS'])) {
+             $datastream = $object['MODS'];
+         } else {
+             $datastream = $object->constructDatastream('MODS','M');
+             $datastream->label = "MODS Record";
+             $datastream->mimetype = "text/xml";
+         }*/
         $datastream = $object['MODS'];
         //$datastream->setContentFromString($mods_new_txt); This function did not update mods string
         $datastream->content = $mods_new_txt; // hence I used this attribute
@@ -2582,7 +2675,8 @@ function minimum_metadata_ingest() {
 
 
     $collection = islandora_object_load($fedora_namespace . ':1');
-
+    $tuque = islandora_get_tuque_connection();
+    $repository = $tuque->repository;
     foreach ($manifest_file as $file_path) {
 
         $file_path = trim($file_path);
@@ -2594,16 +2688,34 @@ function minimum_metadata_ingest() {
             if (fopen($file_path, "r")) {
 
                 $file_name = basename($file_path);
+                // SPARQL query to get all objects in a given namespace.
+                $query = "
+                            SELECT ?obj ?label
+                            FROM <#ri>
+                            WHERE {
+                                ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
+                                ?obj <fedora-model:label> ?label .
+                                FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
+                                FILTER(regex(str(?label), '$file_name'))    
+                            }
+                ";
 
-                $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
-                $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
+                $total = $repository->ri->countQuery($query,'sparql');
+                if(toatl == 0){
+                    $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
+                    $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
 
 
-                _add_datastream_to_object($fedora_object, $file_path, $digitalObject);
-                $ingest_results = islandora_add_object($fedora_object);
+                    _add_datastream_to_object($fedora_object, $file_path, $digitalObject);
+                    $ingest_results = islandora_add_object($fedora_object);
 
 
-                watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
+                    watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
+                } else {
+                    watchdog('Ingest Error', 'Duplicate object @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                    file_put_contents('duplicateObjectFound'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
+                }
+
             } else {
                 watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
                 file_put_contents('CreateObjectFailed'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
@@ -3131,11 +3243,11 @@ function delete_fedoraObject_by_nameSpace_searchQuery($fedora_namespace,$label_s
     _purge_object_by_pid($pids);
 }
 
-function add_dataStream_to_digitalObject() {
+function add_dataStream_to_digitalObject($fedora_namespace,$manifest_file_path,$digitalObject) {
     $time_start = microtime(true);
-    $fedora_namespace = drush_get_option('fedora_namespace');
-    $manifest_file_path = drush_get_option('manifest_file_path');
-    $digitalObject = drush_get_option('digitalObject');
+    //$fedora_namespace = drush_get_option('fedora_namespace');
+    //$manifest_file_path = drush_get_option('manifest_file_path');
+    //$digitalObject = drush_get_option('digitalObject');
 
 
 
@@ -3178,7 +3290,7 @@ function add_dataStream_to_digitalObject() {
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
     
-    watchdog('UCLA Migration', "begin 5 @results", array('@results' => $results), WATCHDOG_NOTICE);
+    watchdog('UCLA Migration', "begin 5 @results", array('@results' => var_dump($results)), WATCHDOG_NOTICE);
    
     foreach ($manifest_file as $file_path) {
 
@@ -3220,6 +3332,7 @@ function add_dataStream_to_digitalObject() {
 //                    $label = str_replace("_a", "", $label);
                     
                     if ($file_name == $label) {
+
                         watchdog('Ingest Success started', ' object @file_name', array('@file_name' => $file_nameRaw), WATCHDOG_NOTICE);
                         $object = islandora_object_load($result['obj']['value']);
                         // $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
