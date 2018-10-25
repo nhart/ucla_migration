@@ -54,7 +54,7 @@ function ucla_migration_drush_command() {
         'description' => 'delete all the objects in a given namespace and search query',
         'arguments' => array(
             'fedora_namespace' => "The Fedora namespace whose PIDS you're looking for.",
-			'label_search' => "label name to be searched",
+            'label_search' => "label name to be searched",
         ),
         'options' => array(),
         'examples' => array(
@@ -76,12 +76,12 @@ function ucla_migration_drush_command() {
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
 
-	$items['ucla_fix_fedoraObject_metadata_by_pids'] = array(
+    $items['ucla_fix_fedoraObject_metadata_by_pids'] = array(
         'callback' => 'fix_fedoraObject_metadata_by_pids',
         'description' => 'fix all the objects in a given pids to add genre',
         'arguments' => array(
             'pids' => "The PIDS you're looking for.",
-			'metadata_value' => "Value of genre that needs to be added to mods",
+            'metadata_value' => "Value of genre that needs to be added to mods",
         ),
         'options' => array(),
         'examples' => array(
@@ -92,14 +92,16 @@ function ucla_migration_drush_command() {
 
     $items['ucla_update_metadata_for_mods_by_pids'] = array(
         'callback' => 'update_metadata_for_mods_by_pids',
-        'description' => 'fix all the objects in a given pids to update genre',
+        'description' => 'fix all the objects in a given pids to update mods element value',
         'arguments' => array(
             'pids' => "The PIDS you're looking for.",
-            'metadata_value' => "Value of genre that needs to be added to mods",
+            'old_metadata_value' => "Old Value of metadata that needs to be replaced",
+            'new_metadata_value' => "New Value of metadata to update with",
+            'local_name' => "mods element to update",
         ),
         'options' => array(),
         'examples' => array(
-            'simple example' => 'drush -u 1 ucla_update_metadata_for_mods_by_pids pids metadata_value',
+            'simple example' => 'drush -u 1 ucla_update_metadata_for_mods_by_pids pids old_metadata_value new_metadata_value local_name',
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
@@ -133,7 +135,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
-    
+
     $items['ucla_update_Label_from_DC_for_PIDS'] = array(
         'callback' => 'update_Label_from_DC_for_PIDS',
         'description' => 'update fedora label to the one from dc:title ',
@@ -165,7 +167,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
-    
+
     $items['ucla_update_DC_from_MODS_for_PIDS'] = array(
         'callback' => 'update_DC_from_MODS_for_PIDS',
         'description' => 'convert dc from mods, if add_mods flag is set to true , ingest the MODS datastream along with DC datastream',
@@ -181,7 +183,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
-    
+
     $items['ucla_add_genre_to_MODS_for_namespace'] = array(
         'callback' => 'add_genre_to_MODS_for_namespace',
         'description' => 'add missing genre to dep mods',
@@ -322,7 +324,7 @@ function ucla_migration_drush_command() {
                 'description' => 'Provide one of following choices (MODS,TIFF,JPEG,PDF,VIDEO,TEI,TN)',
                 'required' => 'true'
             ),
-           
+
         ),
         'examples' => array(
             'simple example' => 'drush -u 1 -l http://example.com ucla_add_dataStream_to_digitalObject fedoranamespace /path/to/manifest/file.txt --digitalObject=MODS',
@@ -355,7 +357,7 @@ function ucla_migration_drush_command() {
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
-    
+
     $items['ucla_share_objects'] = array(
         'callback' => 'share_objects_between_collection',
         'description' => 'This will ingest objects in more than 1 collection',
@@ -376,12 +378,12 @@ function ucla_migration_drush_command() {
                 'description' => 'Provide one of following choices (MODS,TIFF,JPEG,PDF,VIDEO,TN)',
                 'required' => 'true'
             ),
-            
+
             'sharedCollection' => array(
                 'description' => 'comma separated collection pids',
                 'required' => 'true'
             ),
-            
+
         ),
         'examples' => array(
             'simple example' => 'drush -u 1 -l  ucla_share_objects fedoranamespace: manifest_file_path:/path/to/manifest/file.txt --digitalObject=TIFF --sharedCollection:cubanephemera,latinamericanandcaribbeanperiodicals',
@@ -584,7 +586,7 @@ function fix_fedoraObject_metadata_by_pids() {
         //$pid = trim($pid);
         $object = islandora_object_load(trim($pid));
         if (isset($object)) {
-             if (!isset($object['MODS']) || empty($object['MODS'])) {
+            if (!isset($object['MODS']) || empty($object['MODS'])) {
                 watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
             } else {
 
@@ -596,17 +598,28 @@ function fix_fedoraObject_metadata_by_pids() {
 }
 
 
-function update_metadata_for_mods_by_pids($pids,$metadata_value) {
-   // $pids = drush_get_option('pids');
+function update_metadata_for_mods_by_pids($pids,$old_metadata_value,$local_name,$new_metadata_value) {
+    // $pids = drush_get_option('pids');
     if (!isset($pids)) {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
     }
     //$metadata_value = drush_get_option('metadata_value');
-    if (!isset($metadata_value)) {
-        drush_set_error('metadata_value needs to be provided to determine which xslt to be used eg: video recordings ', 'G', 'Error: ');
+    if (!isset($old_metadata_value)) {
+        drush_set_error('metadata_value needs to be provided to determine which value to be updated eg: Newspapers ', 'G', 'Error: ');
         return;
     }
+
+    if (!isset($new_metadata_value)) {
+        drush_set_error('metadata_value needs to be provided to determine which value to update to eg: newspapers ', 'G', 'Error: ');
+        return;
+    }
+
+    if (!isset($local_name)) {
+        drush_set_error('local_name needs to be provided to determine which mods elements will be updated eg genre', 'G', 'Error: ');
+        return;
+    }
+
 
     $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
@@ -626,7 +639,7 @@ function update_metadata_for_mods_by_pids($pids,$metadata_value) {
             } else {
 
                 $mods_txt = $object['MODS']->content;
-                ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_value);
+                ucla_migration_update_metadata_from_mods($object, $mods_txt, $old_metadata_value, $new_metadata_value, $local_name);
             }
         }
     }
@@ -729,12 +742,12 @@ function ucla_migration_save_pids_for_namespace($fedora_namespace) {
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
- * 
+ *
  */
 function update_Label_from_DC_for_namespace() {
-    
-    
-         
+
+
+
     $fedora_namespace = drush_get_option('fedora_namespace');
     if (!isset($fedora_namespace)) {
         drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
@@ -787,17 +800,17 @@ function update_Label_from_DC_for_namespace() {
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
- * 
+ *
  */
 function update_Label_from_DC_for_PIDS() {
-    
-    
+
+
     $pids = drush_get_option('pids');
     if (!isset($pids)) {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
     }
-   
+
     $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
         drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
@@ -809,27 +822,27 @@ function update_Label_from_DC_for_PIDS() {
         //$pid = trim($pid);
         $object = islandora_object_load(trim($pid));
         if (isset($object)) {
-            
-                
-                $dc_txt = $object['DC']->content;
-                $dc_xml = simplexml_load_string($dc_txt);
-    
-                // Register namespaces of the root element.
-                $xml_namespaces = $dc_xml->getDocNamespaces();
-                $dc_xml->registerXPathNamespace('oai_dc', $xml_namespaces['oai_dc']);
-                $dc_xml->registerXPathNamespace('dc', $xml_namespaces['dc']);
-                watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_NOTICE);
-                $dc_query = "//dc:title[1]";
-                $dc_array = $dc_xml->xpath($dc_query);
-                watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_NOTICE);
-    
-                $object->label = $dc_array[0]->__toString();
 
-                
-            
+
+            $dc_txt = $object['DC']->content;
+            $dc_xml = simplexml_load_string($dc_txt);
+
+            // Register namespaces of the root element.
+            $xml_namespaces = $dc_xml->getDocNamespaces();
+            $dc_xml->registerXPathNamespace('oai_dc', $xml_namespaces['oai_dc']);
+            $dc_xml->registerXPathNamespace('dc', $xml_namespaces['dc']);
+            watchdog('UCLA Migration', "begin Label @results", array('@results' => $object->label), WATCHDOG_NOTICE);
+            $dc_query = "//dc:title[1]";
+            $dc_array = $dc_xml->xpath($dc_query);
+            watchdog('UCLA Migration', "begin dc title @results", array('@results' => $dc_array[0]->__toString()), WATCHDOG_NOTICE);
+
+            $object->label = $dc_array[0]->__toString();
+
+
+
         }
     }
-    
+
 }
 
 
@@ -850,7 +863,7 @@ function add_genre_to_MODS_for_namespace(){
 
 
 
-    
+
 
     // Get a connection to Fedora.
     $connection = islandora_get_tuque_connection();
@@ -869,7 +882,7 @@ function add_genre_to_MODS_for_namespace(){
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
     watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_NOTICE);
-      foreach ($results as $result) {
+    foreach ($results as $result) {
         watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
         if ($result['obj']['value'] !== $fedora_namespace . ':1') {
             watchdog('UCLA Migration', "begin 4 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
@@ -893,7 +906,7 @@ function add_genre_to_MODS_for_namespace(){
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
- * 
+ *
  */
 function update_DC_from_MODS_for_namespace($fedora_namespace) {
     //$fedora_namespace = drush_get_option('fedora_namespace');
@@ -955,17 +968,17 @@ function update_DC_from_MODS_for_namespace($fedora_namespace) {
  *  The namespace in Fedora to relate as the collection parent for the
  *  import
  *
- * 
+ *
  */
 function update_DC_from_MODS_for_PIDS() {
-    
-    
+
+
     $pids = drush_get_option('pids');
     if (!isset($pids)) {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
     }
-   
+
 
     $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
     if (!$pids_file) {
@@ -978,15 +991,15 @@ function update_DC_from_MODS_for_PIDS() {
         //$pid = trim($pid);
         $object = islandora_object_load(trim($pid));
         if (!isset($object['MODS']) || empty($object['MODS'])) {
-           watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
+            watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
         } else {
 
             $mods_txt = $object['MODS']->content;
             ucla_migration_add_dc_to_object_from_mods($object, $mods_txt);
         }
     }
-    
-   
+
+
 }
 
 /**
@@ -1364,7 +1377,7 @@ function ucla_migration_migrate_collection_object($fedora_namespace, $mets_xml) 
 
     // Create the NewFedoraObject for the collection.
     $collection = ucla_migration_create_collection_object(
-            $fedora_namespace, $collection_label, $mods_string);
+        $fedora_namespace, $collection_label, $mods_string);
 
     // Ingest the NewFedoraObject.
     $ingest_results = islandora_add_object($collection);
@@ -1415,7 +1428,7 @@ function ucla_migration_migrate_all_children($fedora_namespace, $mets_xml, $coll
             watchdog('UCLA Migration', 'Migrated object @idx out of @total', array(
                 '@idx' => $i + 1,
                 '@total' => count($image_array)
-                    ), WATCHDOG_INFO);
+            ), WATCHDOG_INFO);
         }
     }
 
@@ -1490,7 +1503,7 @@ function ucla_migration_migrate_children_after($fedora_namespace, $mets_xml, $co
             watchdog('UCLA Migration', 'Migrated object @idx / @total', array(
                 '@idx' => $i + 1,
                 '@total' => count($image_array)
-                    ), WATCHDOG_INFO);
+            ), WATCHDOG_INFO);
         }
     }
 
@@ -1721,7 +1734,7 @@ function ucla_migration_migrate_child_object($fedora_namespace, $image_xml, $met
     watchdog('UCLA Migration', 'Ingested @id as @pid', array(
         '@id' => (string) $dmdid,
         '@pid' => $ingest_results->id
-            ), WATCHDOG_INFO);
+    ), WATCHDOG_INFO);
 
     // Return the ingested object.
     return $ingest_results;
@@ -1766,15 +1779,14 @@ function ucla_migration_add_mods_to_object($object, $mods_txt) {
 }
 
 
-function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_value){
+function ucla_migration_update_metadata_from_mods($object, $mods_txt, $old_metadata_value, $new_metadata_value, $local_name){
     try {
         $xslt_proc = new XSLTProcessor();
-        if ($metadata_value == "Newspapers") {
-            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/update_metadata_value.xsl';
-            $xslt_proc->setParameter('','replace','newspapers');
-        } else {
-            watchdog('UCLA Migration', "metadata text is invalid", WATCHDOG_ERROR);
-        }
+
+        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/update_metadata_value.xsl';
+        $xslt_proc->setParameter('','old_value',$old_metadata_value);
+        $xslt_proc->setParameter('','new_value',$new_metadata_value);
+        $xslt_proc->setParameter('','update_element',$local_name);
 
         $xslt_dom = new DOMDocument();
         $xslt_dom->load($xslt_file);
@@ -1788,13 +1800,13 @@ function ucla_migration_update_metadata_from_mods($object, $mods_txt, $metadata_
         $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
         watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
         //  update MODS record to the object as a datastream.
-       /* if (isset($object['MODS'])) {
-            $datastream = $object['MODS'];
-        } else {
-            $datastream = $object->constructDatastream('MODS','M');
-            $datastream->label = "MODS Record";
-            $datastream->mimetype = "text/xml";
-        }*/
+        /* if (isset($object['MODS'])) {
+             $datastream = $object['MODS'];
+         } else {
+             $datastream = $object->constructDatastream('MODS','M');
+             $datastream->label = "MODS Record";
+             $datastream->mimetype = "text/xml";
+         }*/
         $datastream = $object['MODS'];
         //$datastream->setContentFromString($mods_new_txt); This function did not update mods string
         $datastream->content = $mods_new_txt; // hence I used this attribute
@@ -1810,13 +1822,10 @@ function ucla_migration_delete_element_from_mods($object, $mods_txt, $element){
         $xslt_proc = new XSLTProcessor();
 
 
-       if($element){
-            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/delete_element.xsl';
-           $xslt_proc->setParameter('','removeElementsNamed',$element);
-        } else {
-            watchdog('UCLA Migration', "element is invalid", WATCHDOG_ERROR);
-           return;
-        }
+
+        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/delete_element.xsl';
+        $xslt_proc->setParameter('','removeElementsNamed',$element);
+
 
         $xslt_dom = new DOMDocument();
         $xslt_dom->load($xslt_file);
@@ -1850,14 +1859,14 @@ function ucla_migration_delete_element_from_mods($object, $mods_txt, $element){
 function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
     try {
         $xslt_proc = new XSLTProcessor();
-		if ($metadata_value == "video_recordings") {
-		    $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_all_videos.xsl';
-		} elseif ($metadata_value == "digital_moving_image_formats") {
-		   $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_diaspora2.xsl';
-		} else {
-		  $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods.xsl';
-		}
-        
+        if ($metadata_value == "video_recordings") {
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_all_videos.xsl';
+        } elseif ($metadata_value == "digital_moving_image_formats") {
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods_diaspora2.xsl';
+        } else {
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_genre_mods.xsl';
+        }
+
         $xslt_dom = new DOMDocument();
         $xslt_dom->load($xslt_file);
         $xslt_proc->importStyleSheet($xslt_dom);
@@ -2701,7 +2710,7 @@ function minimum_metadata_ingest() {
                 ";
 
                 $total = $repository->ri->countQuery($query,'sparql');
-                if(toatl == 0){
+                if($total == 0){
                     $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
                     $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
 
@@ -2758,7 +2767,7 @@ function share_objects_between_collection() {
         drush_set_error('Please specify one of the following for digitalObject (IMAGE , PDF, VIDEO, MODS, TN)  not specified', '', 'Error: ');
         return;
     }
-    
+
     if (!isset($sharedCollection)) {
         drush_set_error('comma separated collection pids required', '', 'Error: ');
         return;
@@ -2995,8 +3004,8 @@ function add_children_to_compound_object() {
                     $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $fedora_namespace.':1');
                     $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isConstituentOf', $object->id);
                     $escape_pid = str_replace(':', '_', $object->id);
-                   // $fedora_object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:manuscriptPageCModel');
-                   // $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isPageOf', $object->id);
+                    // $fedora_object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:manuscriptPageCModel');
+                    // $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isPageOf', $object->id);
                     $fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, "isSequenceNumberOf$escape_pid", (string) $sequence, TRUE);
                     //$fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $sequence);
                     //$fedora_object->relationships->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1');
@@ -3206,8 +3215,8 @@ function delete_fedoraObject_by_nameSpace_searchQuery($fedora_namespace,$label_s
         drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
         return;
     }
-    
-     if (!isset($label_search)) {
+
+    if (!isset($label_search)) {
         drush_set_error('Search label not provided', 'Search query needed', 'Error: ');
         return;
     }
@@ -3289,9 +3298,9 @@ function add_dataStream_to_digitalObject($fedora_namespace,$manifest_file_path,$
     watchdog('UCLA Migration', "begin 4 @results", array('@results' => $query), WATCHDOG_NOTICE);
     // Execute the query.
     $results = $repo->ri->sparqlQuery($query);
-    
+
     watchdog('UCLA Migration', "begin 5 @results", array('@results' => var_dump($results)), WATCHDOG_NOTICE);
-   
+
     foreach ($manifest_file as $file_path) {
 
         $file_path = trim($file_path);
@@ -3310,34 +3319,34 @@ function add_dataStream_to_digitalObject($fedora_namespace,$manifest_file_path,$
                 $file_name = str_replace("_tei", "", $file_name);
                 $file_name = str_replace("_mods", "", $file_name);
                 $file_name = str_replace(".mp4", "", $file_name);
-                $file_name = str_replace(".png", "", $file_name);  
-                $file_name = str_replace(".jpg", "", $file_name); 
+                $file_name = str_replace(".png", "", $file_name);
+                $file_name = str_replace(".jpg", "", $file_name);
 //                $file_name = str_replace("_a", "", $file_name);
                 watchdog('Ingest Success filename', ' object @file_name', array('@file_name' => $file_name), WATCHDOG_NOTICE);
-               
+
                 foreach ($results as $result) {
                     $label = $result['label']['value'];
                     $label = strtolower($label);
-                   // $label = urldecode($label);
+                    // $label = urldecode($label);
                     $label = str_replace(".tif", "", $label);
                     $label = str_replace(".pdf", "", $label);
-                    
+
                     $label = str_replace(".xml", "", $label);
                     $label = str_replace("_mods", "", $label);
-                   
+
                     $label = str_replace("_tei", "", $label);
                     $label = str_replace(".mp4", "", $label);
                     $label = str_replace(".png", "", $label);
-                    $label = str_replace(".jpg", "", $label); 
+                    $label = str_replace(".jpg", "", $label);
 //                    $label = str_replace("_a", "", $label);
-                    
+
                     if ($file_name == $label) {
 
                         watchdog('Ingest Success started', ' object @file_name', array('@file_name' => $file_nameRaw), WATCHDOG_NOTICE);
                         $object = islandora_object_load($result['obj']['value']);
                         // $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_large_image_cmodel');
                         _add_datastream_to_object($object, $file_path, $digitalObject);
-			break;
+                        break;
                     }
                 }
                 watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_NOTICE);
@@ -3473,7 +3482,7 @@ function _is_valid_extension($file_path) {
     if ($ext === 'tiff') {
         return TRUE;
     }
-    
+
     if ($ext === 'jpg') {
         return TRUE;
     }
@@ -3485,7 +3494,7 @@ function _is_valid_extension($file_path) {
     if ($ext === 'xml') {
         return TRUE;
     }
-    
+
     if ($ext === 'png') {
         return TRUE;
     }
@@ -3540,25 +3549,25 @@ function _add_images_to_object($object, $tiff_path, $jpeg_path) {
  *   Valid path to a png file.
  */
 function _add_png_to_object($object, $png_path) {
-   $datastream_id = 'TN';
-   
+    $datastream_id = 'TN';
+
     $ingest = !isset($object[$datastream_id]);
-   
+
     if ($ingest) {
-      $ds = $object->constructDatastream($datastream_id, "M");
-      $ds->label = $datastream_id;
+        $ds = $object->constructDatastream($datastream_id, "M");
+        $ds->label = $datastream_id;
     }
     else {
-      $ds = $object[$datastream_id];
+        $ds = $object[$datastream_id];
     }
     $ds->mimetype = "image/png";
     $ds->content = file_get_contents($png_path);
-        //->setContentFromFile($png_path); gave filesize() stats error
+    //->setContentFromFile($png_path); gave filesize() stats error
     if ($ingest) {
-      $object->ingestDatastream($ds);
+        $object->ingestDatastream($ds);
     }
-  
-    
+
+
 }
 
 /**
