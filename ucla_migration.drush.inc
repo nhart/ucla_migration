@@ -327,7 +327,7 @@ function ucla_migration_drush_command() {
 
         ),
         'examples' => array(
-            'simple example' => 'drush -u 1 -l http://example.com ucla_add_dataStream_to_digitalObject fedoranamespace /path/to/manifest/file.txt --digitalObject=MODS',
+            'simple example' => 'drush -u 1 -l http://example.com ucla_add_dataStream_to_digitalObject --fedora_namespace=fedoranamespace --manifest_file_path=/path/to/manifest/file.txt --digitalObject=MODS',
         ),
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
@@ -970,10 +970,10 @@ function update_DC_from_MODS_for_namespace($fedora_namespace) {
  *
  *
  */
-function update_DC_from_MODS_for_PIDS() {
+function update_DC_from_MODS_for_PIDS($pids) {
 
 
-    $pids = drush_get_option('pids');
+    //$pids = drush_get_option('pids');
     if (!isset($pids)) {
         drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
         return;
@@ -3252,11 +3252,11 @@ function delete_fedoraObject_by_nameSpace_searchQuery($fedora_namespace,$label_s
     _purge_object_by_pid($pids);
 }
 
-function add_dataStream_to_digitalObject($fedora_namespace,$manifest_file_path,$digitalObject) {
+function add_dataStream_to_digitalObject() {
     $time_start = microtime(true);
-    //$fedora_namespace = drush_get_option('fedora_namespace');
-    //$manifest_file_path = drush_get_option('manifest_file_path');
-    //$digitalObject = drush_get_option('digitalObject');
+    $fedora_namespace = drush_get_option('fedora_namespace');
+    $manifest_file_path = drush_get_option('manifest_file_path');
+    $digitalObject = drush_get_option('digitalObject');
 
 
 
