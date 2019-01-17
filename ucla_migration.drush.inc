@@ -106,6 +106,20 @@ function ucla_migration_drush_command() {
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
 
+    $items['ucla_add_program_idep_to_metadata_by_namespace'] = array(
+        'callback' => 'add_program_idep_to_metadata_by_namespace',
+        'description' => 'fix all the objects in a given pids to update mods element value',
+        'arguments' => array(
+            'fedora_namespace' => "The Fedora namespace whose PIDS you're looking for.",
+
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 ucla_add_program_idep_to_metadata_by_namespace fedora_namespace',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
+
     $items['ucla_delete_mods_element_by_pids'] = array(
         'callback' => 'delete_mods_element_by_pids',
         'description' => 'delete mods element by local_name for the  given pids',
@@ -597,6 +611,53 @@ function fix_fedoraObject_metadata_by_pids() {
     }
 }
 
+
+
+function add_program_idep_to_metadata_by_namespace($fedora_namespace) {
+
+    if (!isset($fedora_namespace)) {
+        drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+
+    // Get a connection to Fedora.
+    $connection = islandora_get_tuque_connection();
+    $repo = $connection->repository;
+
+    // SPARQL query to get all objects in a given namespace.
+    $query = "
+    SELECT ?obj
+    FROM <#ri>
+    WHERE {
+      ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
+      FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:'))
+    }
+  ";
+
+    // Execute the query.
+    $results = $repo->ri->sparqlQuery($query);
+    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_NOTICE);
+
+    foreach ($results as $result) {
+        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
+        if ($result['obj']['value'] !== $fedora_namespace . ':1') {
+
+            $object = islandora_object_load($result['obj']['value']);
+            if (isset($object)) {
+                if (!isset($object['MODS']) || empty($object['MODS'])) {
+                    watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
+                } else {
+
+                    $mods_txt = $object['MODS']->content;
+                    ucla_migration_add_program_to_mods($object, $mods_txt);
+                }
+            }
+        }
+    }
+
+
+
+}
 
 function update_metadata_for_mods_by_pids($pids,$old_metadata_value,$local_name,$new_metadata_value) {
     // $pids = drush_get_option('pids');
