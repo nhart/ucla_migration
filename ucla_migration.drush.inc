@@ -1896,6 +1896,44 @@ function ucla_migration_add_genre_to_mods($object, $mods_txt, $metadata_value){
     }
 }
 
+/*
+ * This function is added to batch update the xslt to add the new mods element to support idep cross collection.
+ */
+function ucla_migration_add_program_to_mods($object, $mods_txt){
+    try {
+        $xslt_proc = new XSLTProcessor();
+
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_idep_program_mods.xsl';
+
+
+        $xslt_dom = new DOMDocument();
+        $xslt_dom->load($xslt_file);
+        $xslt_proc->importStyleSheet($xslt_dom);
+
+        // Prepare the mods DOM to transform.
+        $mods_dom = new DOMDocument();
+        $mods_dom->loadXML($mods_txt);
+
+        // Transform the MODS to DC.
+        $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
+        watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
+        // Add  or update DC record to the object as a datastream.
+        if (isset($object['MODS'])) {
+            $datastream = $object['MODS'];
+        } else {
+            $datastream = $object->constructDatastream('MODS','M');
+            $datastream->label = "MODS Record";
+            $datastream->mimetype = "text/xml";
+        }
+
+        //$datastream->setContentFromString($mods_new_txt);
+        $datastream->content = $mods_new_txt;
+        $object->ingestDatastream($datastream);
+    } catch (Exception $e) {
+
+        watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
+    }
+}
 /**
  * Adds a DC datastream to the supplied object from the supplied MODS text.
  *
