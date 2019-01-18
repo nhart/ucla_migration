@@ -615,48 +615,47 @@ function fix_fedoraObject_metadata_by_pids() {
 
 function add_program_idep_to_metadata_by_namespace($fedora_namespace) {
 
-    if (!isset($fedora_namespace)) {
-        drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
-        return;
-    }
+  if (!isset($fedora_namespace)) {
+      return drush_set_error('Fedora namespace not provided', 'A Fedora namespace to associate with the ingest must be provided', 'Error: ');
+  }
+  // Get a connection to Fedora.
+  $connection = islandora_get_tuque_connection();
+  // SPARQL query to get all objects in a given namespace.
+  $base_query = <<<EOQ
+SELECT DISTINCT ?obj
+WHERE {
+  ?obj <info:fedora/fedora-system:def/model#hasModel> <info:fedora/fedora-system:FedoraObject-3.0> .
+  !filter
+} ORDER BY ?obj
+EOQ;
+  $query = format_string($base_query, array(
+    '!filter' => "FILTER(regex(str(?obj), '^info:fedora/" . $fedora_namespace . "'))",
+  ));
+  // Execute the query.
+  $results = $connection->repository->ri->sparqlQuery($query);
 
-    // Get a connection to Fedora.
-    $connection = islandora_get_tuque_connection();
-    $repo = $connection->repository;
+  watchdog('UCLA Migration', "begin 2", WATCHDOG_NOTICE);
 
-    // SPARQL query to get all objects in a given namespace.
-    $query = "
-    SELECT ?obj
-    FROM <#ri>
-    WHERE {
-      ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
-      FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:'))
-    }
-  ";
+  foreach ($results as $result) {
+    watchdog('UCLA Migration', "begin 3 @pid", array('@pid' => $result['obj']['value']), WATCHDOG_NOTICE);
 
-    // Execute the query.
-    $results = $repo->ri->sparqlQuery($query);
-    watchdog('UCLA Migration', "begin 2 @results", array('@results' => $results), WATCHDOG_NOTICE);
+    if ($result['obj']['value'] !== $fedora_namespace . ':1') {
+      $object = islandora_object_load($result['obj']['value']);
 
-    foreach ($results as $result) {
-        watchdog('UCLA Migration', "begin 3 @results", array('@results' => $result['obj']['value']), WATCHDOG_NOTICE);
-        if ($result['obj']['value'] !== $fedora_namespace . ':1') {
-
-            $object = islandora_object_load($result['obj']['value']);
-            if (isset($object)) {
-                if (!isset($object['MODS']) || empty($object['MODS'])) {
-                    watchdog('UCLA Migration', "begin  No mods @results", array('@results' => $object->id), WATCHDOG_ERROR);
-                } else {
-
-                    $mods_txt = $object['MODS']->content;
-                    ucla_migration_add_program_to_mods($object, $mods_txt);
-                }
-            }
+      if ($object) {
+        if (isset($object['MODS']) && !empty($object['MODS'])) {
+          $mods_txt = $object['MODS']->content;
+          ucla_migration_add_program_to_mods($object, $mods_txt);
         }
+        else {
+          watchdog('UCLA Migration', "begin No mods @pid", array('@pid' => $object->id), WATCHDOG_ERROR);
+        }
+      }
+      else {
+        watchdog('UCLA Migration', "begin Error loading object @pid", array('@pid' => $result['obj']['value']), WATCHDOG_ERROR);
+      }
     }
-
-
-
+  }
 }
 
 function update_metadata_for_mods_by_pids($pids,$old_metadata_value,$local_name,$new_metadata_value) {
@@ -2804,7 +2803,7 @@ function minimum_metadata_ingest() {
                                 ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
                                 ?obj <fedora-model:label> ?label .
                                 FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
-                                FILTER(regex(str(?label), '$file_name'))    
+                                FILTER(regex(str(?label), '$file_name'))
                             }
                 ";
 
@@ -2962,7 +2961,7 @@ function add_children_to_manuscript() {
                 $query = "
     SELECT ?obj ?label
     FROM <#ri>
-    WHERE {    
+    WHERE {
       ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
  ?obj <fedora-model:label> ?label .
       FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
@@ -3068,7 +3067,7 @@ function add_children_to_compound_object() {
                 $query = "
     SELECT ?obj ?label
     FROM <#ri>
-    WHERE {    
+    WHERE {
       ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
  ?obj <fedora-model:label> ?label .
       FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
@@ -3227,7 +3226,7 @@ function fix_page_sequence_number() {
                 $query = "
     SELECT ?obj ?label
     FROM <#ri>
-    WHERE {    
+    WHERE {
       ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
  ?obj <fedora-model:label> ?label .
       FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
@@ -3333,7 +3332,7 @@ function delete_fedoraObject_by_nameSpace_searchQuery($fedora_namespace,$label_s
       ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
       ?obj <fedora-model:label> ?label .
       FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:')) .
-     FILTER(regex(str(?label), '$label_search'))    
+     FILTER(regex(str(?label), '$label_search'))
     }
   ";
     watchdog('Delete step 3 connection object', ' @file_name', array('@file_name' => $query), WATCHDOG_NOTICE);
@@ -3387,7 +3386,7 @@ function add_dataStream_to_digitalObject() {
     $query = "
     SELECT ?obj ?label
     FROM <#ri>
-    WHERE {    
+    WHERE {
       ?obj <info:fedora/fedora-system:def/model#hasModel> ?model .?obj <info:fedora/fedora-system:def/model#hasModel> ?model .
  ?obj <fedora-model:label> ?label .
       FILTER(regex(str(?obj), '^info:fedora/$fedora_namespace:'))
