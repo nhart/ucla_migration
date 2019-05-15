@@ -120,6 +120,20 @@ function ucla_migration_drush_command() {
         'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
     );
 
+    $items['ucla_add_program_idep_to_metadata_by_pids'] = array(
+        'callback' => 'add_program_idep_to_metadata_by_pids',
+        'description' => 'fix all the objects in a given pids to update mods element value',
+        'arguments' => array(
+            'pids' => "The PIDS you're looking for.",
+
+        ),
+        'options' => array(),
+        'examples' => array(
+            'simple example' => 'drush -u 1 ucla_add_program_idep_to_metadata_by_pids pids_file',
+        ),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+    );
+
     $items['ucla_delete_mods_element_by_pids'] = array(
         'callback' => 'delete_mods_element_by_pids',
         'description' => 'delete mods element by local_name for the  given pids',
@@ -657,6 +671,58 @@ EOQ;
     }
   }
 }
+
+
+
+function add_program_idep_to_metadata_by_PIDS($pids) {
+
+    if (!isset($pids)) {
+        drush_set_error('Pids not provided', 'A pids to associate with the ingest must be provided', 'Error: ');
+        return;
+    }
+
+
+    $pids_file = file($pids, FILE_IGNORE_NEW_LINES);
+    if (!$pids_file) {
+        drush_set_error('File not found', "Could not locate manifest file $pids", "Error: ");
+        return;
+    }
+
+
+    foreach ($pids_file as $pid) {
+        $object = islandora_object_load(trim($pid));
+        if ($object) {
+            if (isset($object['MODS']) && !empty($object['MODS'])) {
+                $mods_txt = $object['MODS']->content;
+                ucla_migration_add_program_to_mods($object, $mods_txt);
+            }
+            else {
+                watchdog('UCLA Migration', "begin No mods @pid", array('@pid' => $object->id), WATCHDOG_ERROR);
+            }
+        } else {
+            watchdog('UCLA Migration', "begin Error loading object @pid", array('@pid' => $pid), WATCHDOG_ERROR);
+        }
+    }
+
+/*    // Get a connection to Fedora.
+    $connection = islandora_get_tuque_connection();
+    // SPARQL query to get all objects in a given namespace.
+    $base_query = <<<EOQ
+SELECT DISTINCT ?obj
+WHERE {
+  ?obj <info:fedora/fedora-system:def/model#hasModel> <info:fedora/fedora-system:FedoraObject-3.0> .
+  !filter
+} ORDER BY ?obj
+EOQ;
+    $query = format_string($base_query, array(
+        '!filter' => "FILTER(regex(str(?obj), '^info:fedora/" . $fedora_namespace . "'))",
+    ));
+    // Execute the query.
+    $results = $connection->repository->ri->sparqlQuery($query);*/
+
+
+}
+
 
 function update_metadata_for_mods_by_pids($pids,$old_metadata_value,$local_name,$new_metadata_value) {
     // $pids = drush_get_option('pids');
@@ -1882,9 +1948,13 @@ function ucla_migration_delete_element_from_mods($object, $mods_txt, $element){
         $xslt_proc = new XSLTProcessor();
 
 
+        if($element == "idep") {
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/delete_extra_idep_program.xsl';
+        } else {
+            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/delete_element.xsl';
+            $xslt_proc->setParameter('','removeElementsNamed',$element);
+        }
 
-        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/delete_element.xsl';
-        $xslt_proc->setParameter('','removeElementsNamed',$element);
 
 
         $xslt_dom = new DOMDocument();
@@ -1963,9 +2033,9 @@ function ucla_migration_add_program_to_mods($object, $mods_txt){
     try {
         $xslt_proc = new XSLTProcessor();
 
-            $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_idep_program_mods.xsl';
-
-
+        // $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_idep_program_mods.xsl';
+	//$xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_collection_tahrir_mods.xsl';
+        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_type_to_collection_field.xsl';
         $xslt_dom = new DOMDocument();
         $xslt_dom->load($xslt_file);
         $xslt_proc->importStyleSheet($xslt_dom);

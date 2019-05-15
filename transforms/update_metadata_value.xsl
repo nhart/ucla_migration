@@ -15,7 +15,7 @@
                     <xsl:apply-templates select="@*|node()"/>
                 </xsl:copy>
             </xsl:when>
-            <xsl:when test="self::text() and self::text()=$old_value">
+            <xsl:when test="self::text() and normalize-space(self::text())=$old_value">
                 <xsl:value-of select="$new_value"/>
             </xsl:when>
             <xsl:otherwise>

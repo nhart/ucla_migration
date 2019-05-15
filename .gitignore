@@ -1,2 +1,4 @@
 *.pids
 .idea/
+*.xml
+*.bak
