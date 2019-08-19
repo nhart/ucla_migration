@@ -2035,7 +2035,8 @@ function ucla_migration_add_program_to_mods($object, $mods_txt){
 
         // $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_idep_program_mods.xsl';
 	//$xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_collection_tahrir_mods.xsl';
-        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_type_to_collection_field.xsl';
+       // $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_type_to_collection_field.xsl';
+        $xslt_file = drupal_get_path('module', 'ucla_migration') . '/transforms/add_date_issued_to_titles.xsl';
         $xslt_dom = new DOMDocument();
         $xslt_dom->load($xslt_file);
         $xslt_proc->importStyleSheet($xslt_dom);
