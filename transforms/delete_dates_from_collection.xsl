@@ -9,11 +9,11 @@
         </xsl:copy>
     </xsl:template>
 
-    <xsl:template match="//mods:mods/mods:titleInfo/mods:title">
+    <xsl:template match="//mods:mods/mods:relatedItem[@type='host']/mods:titleInfo/mods:title">
         <xsl:copy>
             <xsl:choose>
-                <xsl:when test="starts-with(., 'La Lucha')">
-                    La Lucha <xsl:value-of select="//mods:dateIssued"/>
+                <xsl:when test="starts-with(normalize-space(.), 'La Lucha')">
+                    La Lucha
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:apply-templates select="@*|node()"/>
