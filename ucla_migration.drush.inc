@@ -3854,7 +3854,7 @@ EOQ;
         }
         watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
         try {
-            $datastream->setContentFromFile($tei_path)
+            $datastream->setContentFromFile($tei_path);
             if ($is_new_tei_ds) {
                 $object->ingestDatastream($datastream);
             }
