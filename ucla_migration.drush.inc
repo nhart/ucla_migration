@@ -3836,31 +3836,30 @@ EOQ;
      * @param FedoraObject $object
      *   The object you wish to add the datastream to.
      *
-     * @param string $mods_path
+     * @param string $tei_path
      *   Valid path to a mods xml file.
      */
     function _add_teixml_to_object($object, $tei_path) {
         // get mods datastream from object if exist or else create a new one add this logic
         watchdog('Ingest Success', 'In add teixml @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
         $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:manuscriptCModel');
-        $is_new_mods_ds = FALSE;
+        $is_new_tei_ds = FALSE;
         if (isset($object['TEI'])) {
             $datastream = $object['TEI'];
         } else {
             $datastream = $object->constructDatastream('TEI', 'M');
             $datastream->label = "TEI Record";
             $datastream->mimetype = "text/xml";
-            $is_new_mods_ds = TRUE;
+            $is_new_tei_ds = TRUE;
         }
         watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
-        //$datastream->setContentFromFile($mods_path);
         try {
-            $tei_file = file_get_contents($tei_path);
-            $datastream->content = $tei_file;
-            if ($is_new_mods_ds) {
+            $datastream->setContentFromFile($tei_path)
+            if ($is_new_tei_ds) {
                 $object->ingestDatastream($datastream);
             }
-        }catch (Exception $e) {
+        }
+        catch (Exception $e) {
             watchdog('Ingest Fail', 'Failed to update @label (@object)',
                 array(
                     '@object' => $object->id,
@@ -3898,7 +3897,7 @@ EOQ;
 
         try {
             $mods_file = file_get_contents($mods_path);
-            $datastream->content($mods_file);
+            $datastream->content = $mods_file;
             if ($is_new_mods_ds) {
                 $object->ingestDatastream($datastream);
             }
