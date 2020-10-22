@@ -2005,21 +2005,25 @@ EOQ;
             $mods_dom = new DOMDocument();
             $mods_dom->loadXML($mods_txt);
 
-            // Transform the MODS to DC.
+            // Transform the MODS to Mods with genre.
             $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
             watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
-            // Add  or update DC record to the object as a datastream.
+            // Add  or update Mods record to the object as a datastream.
+            $is_new_mods_ds = FALSE;
             if (isset($object['MODS'])) {
                 $datastream = $object['MODS'];
             } else {
                 $datastream = $object->constructDatastream('MODS','M');
                 $datastream->label = "MODS Record";
                 $datastream->mimetype = "text/xml";
+                $is_new_mods_ds = TRUE;
             }
 
             //$datastream->setContentFromString($mods_new_txt);
             $datastream->content = $mods_new_txt;
-            $object->ingestDatastream($datastream);
+            if ($is_new_mods_ds) {
+                $object->ingestDatastream($datastream);
+            }
         } catch (Exception $e) {
 
             watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
@@ -2046,21 +2050,25 @@ EOQ;
             $mods_dom = new DOMDocument();
             $mods_dom->loadXML($mods_txt);
 
-            // Transform the MODS to DC.
+            // Transform the MODS to add program name.
             $mods_new_txt = $xslt_proc->transformToXML($mods_dom);
             watchdog('UCLA Migration', "Mods Record is : @results", array('@results' => $mods_new_txt), WATCHDOG_NOTICE);
-            // Add  or update DC record to the object as a datastream.
+            // Add  or update Mods record to the object as a datastream.
+            $is_new_mods_ds = FALSE;
             if (isset($object['MODS'])) {
                 $datastream = $object['MODS'];
             } else {
                 $datastream = $object->constructDatastream('MODS','M');
                 $datastream->label = "MODS Record";
                 $datastream->mimetype = "text/xml";
+                $is_new_mods_ds = TRUE;
             }
 
             //$datastream->setContentFromString($mods_new_txt);
             $datastream->content = $mods_new_txt;
-            $object->ingestDatastream($datastream);
+            if ($is_new_mods_ds) {
+                $object->ingestDatastream($datastream);
+            }
         } catch (Exception $e) {
 
             watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
@@ -2092,17 +2100,21 @@ EOQ;
             $dc_txt = $xslt_proc->transformToXML($mods_dom);
             watchdog('UCLA Migration', "DC Record is : @results", array('@results' => $dc_txt), WATCHDOG_NOTICE);
             // Add  or update DC record to the object as a datastream.
+            $is_new_mods_ds = FALSE;
             if (isset($object['DC'])) {
                 $datastream = $object['DC'];
             } else {
                 $datastream = $object->constructDatastream('DC');
                 $datastream->label = "Dublin Core Record";
                 $datastream->mimetype = "text/xml";
+                $is_new_mods_ds = TRUE;
             }
 
             //$datastream->setContentFromString($dc_txt);
             $datastream->content = $dc_txt;
-            $object->ingestDatastream($datastream);
+            if ($is_new_mods_ds) {
+                $object->ingestDatastream($datastream);
+            }
         } catch (Exception $e) {
 
             watchdog('UCLA Migration', "Exception Trace is : @results", array('@results' => $e->getTraceAsString()), WATCHDOG_ERROR);
@@ -3431,7 +3443,7 @@ EOQ;
 
 
         if (!isset($digitalObject)) {
-            drush_set_error('Please specify one of the following for digitalObject (TIFF,JPEG , PDF, VIDEO, MODS, TEI, TN)  not specified', '', 'Error: ');
+            drush_set_error('Please specify one of the following for digitalObject (TIFF, JPEG, PDF, VIDEO, MODS, TEI, TN)  not specified', '', 'Error: ');
             return;
         }
 
@@ -3818,30 +3830,44 @@ EOQ;
     }
 
     /**
+     *
      * Adds a MODS xml to the supplied object as the OBJ datastream.
      *
      * @param FedoraObject $object
      *   The object you wish to add the datastream to.
      *
-     * @param string $mods_path
+     * @param string $tei_path
      *   Valid path to a mods xml file.
      */
     function _add_teixml_to_object($object, $tei_path) {
         // get mods datastream from object if exist or else create a new one add this logic
         watchdog('Ingest Success', 'In add teixml @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
         $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:manuscriptCModel');
+        $is_new_tei_ds = FALSE;
         if (isset($object['TEI'])) {
             $datastream = $object['TEI'];
         } else {
             $datastream = $object->constructDatastream('TEI', 'M');
             $datastream->label = "TEI Record";
             $datastream->mimetype = "text/xml";
+            $is_new_tei_ds = TRUE;
         }
         watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $tei_path), WATCHDOG_NOTICE);
-        //$datastream->setContentFromFile($mods_path);
-        $tei_file = file_get_contents($tei_path);
-        $datastream->content = $tei_file;
-        $object->ingestDatastream($datastream);
+        try {
+            $datastream->setContentFromFile($tei_path);
+            if ($is_new_tei_ds) {
+                $object->ingestDatastream($datastream);
+            }
+        }
+        catch (Exception $e) {
+            watchdog('Ingest Fail', 'Failed to update @label (@object)',
+                array(
+                    '@object' => $object->id,
+                    '@label' => $object->label,
+                ),
+                WATCHDOG_NOTICE
+            );
+        }
 
         watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $tei_file), WATCHDOG_NOTICE);
     }
@@ -3858,18 +3884,33 @@ EOQ;
     function _add_modsxml_to_object($object, $mods_path) {
         // get mods datastream from object if exist or else create a new one add this logic
         watchdog('Ingest Success', 'In add modsxml @file_name', array('@file_name' => $mods_path), WATCHDOG_NOTICE);
+        $is_new_mods_ds = FALSE;
         if (isset($object['MODS'])) {
             $datastream = $object['MODS'];
-        } else {
+        }
+        else {
             $datastream = $object->constructDatastream('MODS', 'M');
             $datastream->label = "MODS Record";
             $datastream->mimetype = "text/xml";
+            $is_new_mods_ds = TRUE;
         }
-        watchdog('Ingest Success', 'Found datastream @file_name', array('@file_name' => $mods_path), WATCHDOG_NOTICE);
-        //$datastream->setContentFromFile($mods_path);
-        $mods_file = file_get_contents($mods_path);
-        $datastream->content = $mods_file;
-        $object->ingestDatastream($datastream);
+
+        try {
+            $mods_file = file_get_contents($mods_path);
+            $datastream->content = $mods_file;
+            if ($is_new_mods_ds) {
+                $object->ingestDatastream($datastream);
+            }
+        }
+        catch (Exception $e) {
+            watchdog('Ingest Fail', 'Failed to update @label (@object)',
+                array(
+                    '@object' => $object->id,
+                    '@label' => $object->label,
+                ),
+                WATCHDOG_NOTICE
+            );
+        }
 
         watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $mods_file), WATCHDOG_NOTICE);
     }
