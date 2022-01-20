@@ -3837,8 +3837,7 @@ EOQ;
         }
 
         try {
-            $pdf_file = file_get_contents($pdf_path);
-            $datastream->content($pdf_file);
+            $datastream->setContentFromFile($pdf_path);
             if ($is_new_pdf_ds) {
                 $object->ingestDatastream($datastream);
             }
