@@ -3812,7 +3812,7 @@ EOQ;
     }
 
     /**
-     * Adds a PDF to the supplied object as the OBJ datastream.
+     * Adds/Updates a PDF to the supplied object as the OBJ datastream.
      *
      * @param FedoraObject $object
      *   The object you wish to add the datastream to.
@@ -3821,12 +3821,47 @@ EOQ;
      *   Valid path to a pdf file.
      */
     function _add_pdf_to_object($object, $pdf_path) {
-        $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_pdf');
-        $datastream = $object->constructDatastream('OBJ', 'M');
-        $datastream->label = "PDF Document";
-        $datastream->mimetype = "application/pdf";
-        $datastream->setContentFromFile($pdf_path);
-        $object->ingestDatastream($datastream);
+
+        // get pdf datastream from object if exist or else create a new one add this logic
+        watchdog('Ingest Success', 'In add/update pdf @file_name', array('@file_name' => $pdf_path), WATCHDOG_NOTICE);
+        $is_new_pdf_ds = FALSE;
+        if (isset($object['OBJ'])) {
+            $datastream = $object['OBJ'];
+        }
+        else {
+            $relation_exists = FALSE;
+            foreach ($object->relationships->get(FEDORA_MODEL_URI, 'hasModel') as $relationship) {
+                 if($relationship['object']['value'] == 'islandora:sp_pdf'){
+                     $relation_exists =TRUE;
+                     break;
+                 }
+            }
+            if(!$relation_exists) {
+                $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_pdf');
+            }
+            $datastream = $object->constructDatastream('OBJ', 'M');
+            $datastream->label = "PDF Document";
+            $datastream->mimetype = "application/pdf";
+            $is_new_pdf_ds = TRUE;
+        }
+
+        try {
+            $datastream->setContentFromFile($pdf_path);
+            if ($is_new_pdf_ds) {
+                $object->ingestDatastream($datastream);
+            }
+        }
+        catch (Exception $e) {
+            watchdog('Ingest Fail', 'Failed to update @label (@object)',
+                array(
+                    '@object' => $object->id,
+                    '@label' => $object->label,
+                ),
+                WATCHDOG_NOTICE
+            );
+        }
+
+        watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $pdf_file), WATCHDOG_NOTICE);
     }
 
     /**
