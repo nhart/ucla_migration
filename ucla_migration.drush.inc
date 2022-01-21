@@ -3829,7 +3829,16 @@ EOQ;
             $datastream = $object['OBJ'];
         }
         else {
-            $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_pdf');
+            $relation_exists = FALSE;
+            foreach ($object->relationships->get(FEDORA_MODEL_URI, 'hasModel') as $relationship) {
+                 if($relationship['object']['value'] == 'islandora:sp_pdf'){
+                     $relation_exists =TRUE;
+                     break;
+                 }
+            }
+            if(!$relation_exists) {
+                $object->relationships->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:sp_pdf');
+            }
             $datastream = $object->constructDatastream('OBJ', 'M');
             $datastream->label = "PDF Document";
             $datastream->mimetype = "application/pdf";
@@ -3854,7 +3863,6 @@ EOQ;
 
         watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $pdf_file), WATCHDOG_NOTICE);
     }
-
 
     /**
      *
