@@ -2840,7 +2840,7 @@ EOQ;
         $time_start = microtime(true);
         $fedora_namespace = drush_get_option('fedora_namespace');
         $manifest_file_path = drush_get_option('manifest_file_path');
-        $overwrite = drush_get_option('overwrite');
+        $overwrite = (bool)drush_get_option('overwrite');
         $digitalObject = drush_get_option('digitalObject');
 
 
@@ -2891,8 +2891,8 @@ EOQ;
                                 }
                     ";
 
-                    $total = $repository->ri->countQuery($query,'sparql');
-                    if($total == 0){
+                    $results = $repository->ri->sparqlQuery($query,'sparql');
+                    if(count($results) == 0){
                         $fedora_object = ucla_migration_create_fedora_object($fedora_namespace, $file_name);
                         $fedora_object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $collection->id);
 
@@ -2903,8 +2903,22 @@ EOQ;
 
                         watchdog('Ingest Success', 'Migrated object @file_name', array('@file_name' => $file_name), WATCHDOG_INFO);
                     } else {
-                        watchdog('Ingest Error', 'Duplicate object @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
-                        file_put_contents('duplicateObjectFound'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
+                        if  ($overwrite) {
+                            $pid = array_shift($results);
+                            $pid = $pid['obj']['value'];
+                            $fedora_object = islandora_object_load($pid);
+                            if ($fedora_object) {
+                                _add_datastream_to_object($fedora_object, $file_path, $digitalObject);
+                             }
+                             else {
+                                 watchdog('Ingest Error', 'Datastream ingest failed for @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                                 file_put_contents('UpdateObjectFailed'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
+                             }
+                        }
+                        else {
+                          watchdog('Ingest Error', 'Duplicate object @file_path ', array('@file_path' => $file_path), WATCHDOG_ERROR);
+                          file_put_contents('duplicateObjectFound'.date("Y-m-d").'.txt',$file_path, FILE_APPEND);
+                        }
                     }
 
                 } else {
